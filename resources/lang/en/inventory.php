@@ -1,0 +1,30 @@
+<?php
+// Path: resources/lang/en/inventory.php
+
+return [
+    'inventory_dashboard' => 'Inventory Dashboard',
+    'categories' => 'Categories',
+    'products' => 'Products',
+    'warehouses' => 'Warehouses',
+    'stock_movements' => 'Stock Movements',
+    'add_category' => 'Add New Category',
+    'category_name' => 'Category Name',
+    'parent_category' => 'Parent Category',
+    'no_parent' => '-- No Parent --',
+    'add_product' => 'Add New Product',
+    'sku' => 'SKU (Item Code)',
+    'product_name' => 'Product Name',
+    'product_type' => 'Product Type',
+    'type_storable' => 'Storable Product',
+    'type_service' => 'Service',
+    'type_consumable' => 'Consumable',
+    'cost_price' => 'Cost Price',
+    'sale_price' => 'Sale Price',
+    'status' => 'Status',
+    'active' => 'Active',
+    'inactive' => 'Inactive',
+    'stock_overview' => 'Stock Valuation Overview',
+    'total_products' => 'Total Products',
+    'total_categories' => 'Total Categories',
+    'low_stock_alerts' => 'Low Stock Alerts',
+];

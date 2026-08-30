@@ -1,0 +1,33 @@
+<?php
+// Path: resources/lang/en/purchasing.php
+
+return [
+    'purchasing_dashboard' => 'Purchasing Dashboard',
+    'suppliers' => 'Suppliers',
+    'purchase_orders' => 'Purchase Orders',
+    'invoices' => 'Purchase Invoices',
+    'add_supplier' => 'Add New Supplier',
+    'supplier_name' => 'Supplier Name',
+    'contact_email' => 'Contact Email',
+    'phone' => 'Phone Number',
+    'address' => 'Address',
+    'create_order' => 'Create Purchase Order',
+    'order_number' => 'PO Number',
+    'order_date' => 'Order Date',
+    'status' => 'Status',
+    'total_amount' => 'Total Amount',
+    'draft' => 'Draft',
+    'sent' => 'Sent to Supplier',
+    'received' => 'Received',
+    'cancelled' => 'Cancelled',
+    'product' => 'Product',
+    'quantity' => 'Quantity',
+    'unit_price' => 'Unit Price',
+    'subtotal' => 'Subtotal',
+    'add_line' => 'Add Item',
+    'grand_total' => 'Grand Total',
+    'recent_orders' => 'Recent Purchase Orders',
+    'monthly_spend' => 'Monthly Purchasing Spend',
+    'total_suppliers' => 'Total Suppliers',
+    'pending_orders' => 'Pending Orders',
+];

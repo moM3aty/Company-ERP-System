@@ -1,0 +1,32 @@
+<?php
+// Path: resources/lang/en/treasury.php
+
+return [
+    'treasury_dashboard' => 'Treasury & Banking',
+    'accounts' => 'Treasury Accounts',
+    'transfers' => 'Internal Transfers',
+    'receipts' => 'Cash Receipts',
+    'payments' => 'Payment Vouchers',
+    'reconciliation' => 'Bank Reconciliation',
+    'add_account' => 'Add New Account',
+    'account_name' => 'Account / Bank Name',
+    'account_number' => 'Account Number',
+    'account_type' => 'Type',
+    'cash_box' => 'Cash Box / Safe',
+    'bank_account' => 'Bank Account',
+    'currency' => 'Currency',
+    'current_balance' => 'Current Balance',
+    'status' => 'Status',
+    'create_transfer' => 'New Internal Transfer',
+    'from_account' => 'From Account',
+    'to_account' => 'To Account',
+    'amount' => 'Amount to Transfer',
+    'transfer_date' => 'Transfer Date',
+    'reference' => 'Reference / Memo',
+    'total_cash' => 'Total Cash Balance',
+    'total_bank' => 'Total Bank Balances',
+    'cash_flow' => 'Cash Flow Overview',
+    'inflow' => 'Cash Inflow',
+    'outflow' => 'Cash Outflow',
+    'recent_transfers' => 'Recent Transfers',
+];

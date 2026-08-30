@@ -1,0 +1,32 @@
+<?php
+// Path: resources/lang/ar/treasury.php
+
+return [
+    'treasury_dashboard' => 'الخزينة والبنوك',
+    'accounts' => 'حسابات الخزينة',
+    'transfers' => 'التحويلات الداخلية',
+    'receipts' => 'سندات القبض',
+    'payments' => 'سندات الصرف',
+    'reconciliation' => 'التسويات البنكية',
+    'add_account' => 'إضافة حساب جديد',
+    'account_name' => 'اسم البنك / الخزينة',
+    'account_number' => 'رقم الحساب',
+    'account_type' => 'النوع',
+    'cash_box' => 'خزينة نقدية',
+    'bank_account' => 'حساب بنكي',
+    'currency' => 'العملة',
+    'current_balance' => 'الرصيد الحالي',
+    'status' => 'الحالة',
+    'create_transfer' => 'تحويل داخلي جديد',
+    'from_account' => 'من حساب',
+    'to_account' => 'إلى حساب',
+    'amount' => 'المبلغ المحول',
+    'transfer_date' => 'تاريخ التحويل',
+    'reference' => 'البيان / المرجع',
+    'total_cash' => 'إجمالي النقدية بالخزينة',
+    'total_bank' => 'إجمالي أرصدة البنوك',
+    'cash_flow' => 'نظرة عامة على التدفقات النقدية',
+    'inflow' => 'التدفقات النقدية الواردة',
+    'outflow' => 'التدفقات النقدية الصادرة',
+    'recent_transfers' => 'أحدث التحويلات',
+];

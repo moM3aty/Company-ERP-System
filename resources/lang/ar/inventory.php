@@ -1,0 +1,30 @@
+<?php
+// Path: resources/lang/ar/inventory.php
+
+return [
+    'inventory_dashboard' => 'لوحة تحكم المخازن',
+    'categories' => 'فئات المنتجات',
+    'products' => 'المنتجات',
+    'warehouses' => 'المستودعات',
+    'stock_movements' => 'الحركات المخزنية',
+    'add_category' => 'إضافة فئة جديدة',
+    'category_name' => 'اسم الفئة',
+    'parent_category' => 'الفئة الرئيسية',
+    'no_parent' => '-- بدون فئة رئيسية --',
+    'add_product' => 'إضافة منتج جديد',
+    'sku' => 'كود الصنف (SKU)',
+    'product_name' => 'اسم المنتج',
+    'product_type' => 'نوع المنتج',
+    'type_storable' => 'منتج مخزني',
+    'type_service' => 'خدمة',
+    'type_consumable' => 'مستهلكات',
+    'cost_price' => 'سعر التكلفة',
+    'sale_price' => 'سعر البيع',
+    'status' => 'الحالة',
+    'active' => 'نشط',
+    'inactive' => 'غير نشط',
+    'stock_overview' => 'نظرة عامة على تقييم المخزون',
+    'total_products' => 'إجمالي المنتجات',
+    'total_categories' => 'إجمالي الفئات',
+    'low_stock_alerts' => 'تنبيهات انخفاض المخزون',
+];

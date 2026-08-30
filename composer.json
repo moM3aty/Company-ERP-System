@@ -1,0 +1,28 @@
+{
+    "name": "enterprise/erp-system",
+    "description": "Enterprise Resource Planning System build with PHP 8",
+    "type": "project",
+    "license": "proprietary",
+    "require": {
+        "php": "^8.0",
+        "ext-pdo": "*",
+        "ext-json": "*",
+        "ext-openssl": "*"
+    },
+    "autoload": {
+        "classmap": [
+            "app/",
+            "core/"
+        ],
+        "files": [
+            "core/Helpers/functions.php"
+        ]
+    },
+    "config": {
+        "optimize-autoloader": true,
+        "preferred-install": "dist",
+        "sort-packages": true
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true
+}

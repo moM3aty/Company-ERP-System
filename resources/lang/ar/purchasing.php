@@ -1,0 +1,33 @@
+<?php
+// Path: resources/lang/ar/purchasing.php
+
+return [
+    'purchasing_dashboard' => 'لوحة المشتريات',
+    'suppliers' => 'الموردين',
+    'purchase_orders' => 'أوامر الشراء',
+    'invoices' => 'فواتير المشتريات',
+    'add_supplier' => 'إضافة مورد جديد',
+    'supplier_name' => 'اسم المورد',
+    'contact_email' => 'البريد الإلكتروني',
+    'phone' => 'رقم الهاتف',
+    'address' => 'العنوان',
+    'create_order' => 'إنشاء أمر شراء',
+    'order_number' => 'رقم الأمر (PO)',
+    'order_date' => 'تاريخ الأمر',
+    'status' => 'الحالة',
+    'total_amount' => 'الإجمالي',
+    'draft' => 'مسودة',
+    'sent' => 'أرسل للمورد',
+    'received' => 'تم الاستلام',
+    'cancelled' => 'ملغي',
+    'product' => 'المنتج',
+    'quantity' => 'الكمية',
+    'unit_price' => 'سعر الوحدة',
+    'subtotal' => 'المجموع الفرعي',
+    'add_line' => 'إضافة صنف',
+    'grand_total' => 'الإجمالي العام',
+    'recent_orders' => 'أحدث أوامر الشراء',
+    'monthly_spend' => 'الإنفاق الشهري على المشتريات',
+    'total_suppliers' => 'إجمالي الموردين',
+    'pending_orders' => 'الطلبات المعلقة',
+];
