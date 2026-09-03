@@ -18,17 +18,17 @@ register_shutdown_function(function() {
         while (ob_get_level()) {
             ob_end_clean();
         }
-        header('Content-Type: text/html; charset=UTF-8');
+        if (!headers_sent()) {
+            header('Content-Type: text/html; charset=UTF-8');
+        }
         echo "<div style='padding:30px; background:#ffffff; color:#dc2626; font-family:monospace; direction:ltr; text-align:left; border:3px solid #dc2626; margin:20px; border-radius:12px; box-shadow:0 10px 25px rgba(0,0,0,0.1);'>";
-        echo "<h2 style='margin-0 0 10px 0;'>🚨 Fatal Error Captured</h2>";
+        echo "<h2 style='margin: 0 0 10px 0;'>🚨 Fatal Error Captured</h2>";
         echo "<p style='font-size:1.1rem;'><b>Message:</b> " . htmlspecialchars($error['message']) . "</p>";
         echo "<p><b>File:</b> " . htmlspecialchars($error['file']) . "</p>";
         echo "<p><b>Line:</b> " . $error['line'] . "</p>";
         echo "</div>";
     }
 });
-
-header('Content-Type: text/html; charset=UTF-8');
 
 $basePath = dirname(__DIR__);
 
@@ -89,6 +89,7 @@ try {
     $app->singleton(\PDO::class, $pdo);
 } catch (\PDOException $e) {
     $logger->error("Database Connection Failed: " . $e->getMessage());
+    if (!headers_sent()) { header('Content-Type: text/html; charset=UTF-8'); }
     die("<div style='padding:30px; color:red; font-family:sans-serif;'><h3>خطأ في الاتصال بقاعدة البيانات</h3><p>" . $e->getMessage() . "</p></div>");
 }
 
@@ -125,12 +126,20 @@ if (file_exists($webRoutes)) {
     require_once $webRoutes;
 }
 
-// 9. تشغيل التطبيق وإرسال الرد
+// 9. تشغيل التطبيق وإرسال الرد (الحل الجذري للمشكلة)
 $request = Request::capture();
 $response = $app->run($request);
 
 if ($response instanceof Response) {
+    // إجبار السيرفر على اعتبار الرد كـ HTML ما لم يكن رد توجيه (Redirect)
+    if (!headers_sent() && !($response instanceof \Core\Http\RedirectResponse)) {
+        header('Content-Type: text/html; charset=UTF-8');
+    }
     $response->send();
 } else {
+    // في حالة الردود المباشرة (النصوص أو الـ Views المطبوعة مباشرة)
+    if (!headers_sent()) {
+        header('Content-Type: text/html; charset=UTF-8');
+    }
     echo $response;
 }

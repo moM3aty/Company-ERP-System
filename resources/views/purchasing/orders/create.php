@@ -3,8 +3,79 @@
 
 if (session_status() === PHP_SESSION_NONE) session_start();
 $isRtl = ($_SESSION['locale'] ?? 'ar') === 'ar';
+$currency = current_currency();
+
 $isEdit = isset($order) && $order !== null;
 $actionUrl = $isEdit ? "/ERP/purchasing/orders/{$order->id}/update" : "/ERP/purchasing/orders/store";
+
+$t = [
+    'ar' => [
+        'title_new' => 'إصدار أمر شراء جديد (PO)',
+        'title_edit' => 'تعديل أمر الشراء',
+        'basic_info' => 'بيانات أمر الشراء الأساسية',
+        'supplier' => 'المورد',
+        'select_supplier' => '-- اختر المورد --',
+        'po_number' => 'رقم الـ PO (يولد تلقائياً إن تُرك فارغاً)',
+        'order_date' => 'تاريخ الإصدار',
+        'delivery_date' => 'تاريخ التوريد المتوقع',
+        'status' => 'حالة الأمر',
+        'status_draft' => 'مسودة',
+        'status_sent' => 'مُرسل للمورد',
+        'status_partially_received' => 'مستلم جزئياً',
+        'status_completed' => 'مكتمل (تم الاستلام)',
+        'status_cancelled' => 'ملغي',
+        'items_pricing' => 'الأصناف والتسعير',
+        'add_item' => 'إضافة صنف',
+        'col_prod' => 'الصنف (الكود والاسم)',
+        'col_desc' => 'الوصف',
+        'col_qty' => 'الكمية',
+        'col_price' => 'سعر الوحدة',
+        'col_total' => 'الإجمالي',
+        'col_remove' => 'إزالة',
+        'notes_label' => 'ملاحظات للمورد وشروط الدفع',
+        'subtotal' => 'الإجمالي الفرعي (Subtotal):',
+        'discount' => 'الخصم (Discount):',
+        'tax' => 'الضريبة المضافة (Tax):',
+        'grand_total' => 'الصافي المطلوب (Total):',
+        'unregistered' => '-- غير مسجل / يدوي --',
+        'cancel' => 'إلغاء وتراجع',
+        'save' => 'إصدار أمر الشراء',
+        'update' => 'تحديث الأمر'
+    ],
+    'en' => [
+        'title_new' => 'Issue New Purchase Order (PO)',
+        'title_edit' => 'Edit Purchase Order',
+        'basic_info' => 'Purchase Order Basic Info',
+        'supplier' => 'Supplier',
+        'select_supplier' => '-- Select Supplier --',
+        'po_number' => 'PO Number (Auto generated if empty)',
+        'order_date' => 'Issue Date',
+        'delivery_date' => 'Expected Delivery Date',
+        'status' => 'Order Status',
+        'status_draft' => 'Draft',
+        'status_sent' => 'Sent to Vendor',
+        'status_partially_received' => 'Partially Received',
+        'status_completed' => 'Completed',
+        'status_cancelled' => 'Cancelled',
+        'items_pricing' => 'Items & Pricing',
+        'add_item' => 'Add Item',
+        'col_prod' => 'Product (Code & Name)',
+        'col_desc' => 'Description',
+        'col_qty' => 'Quantity',
+        'col_price' => 'Unit Price',
+        'col_total' => 'Total',
+        'col_remove' => 'Remove',
+        'notes_label' => 'Vendor Notes & Payment Terms',
+        'subtotal' => 'Subtotal:',
+        'discount' => 'Discount:',
+        'tax' => 'Tax:',
+        'grand_total' => 'Total Due:',
+        'unregistered' => '-- Unregistered / Manual --',
+        'cancel' => 'Cancel',
+        'save' => 'Issue Purchase Order',
+        'update' => 'Update Order'
+    ]
+][$isRtl ? 'ar' : 'en'];
 ?>
 
 <style>
@@ -41,8 +112,8 @@ $actionUrl = $isEdit ? "/ERP/purchasing/orders/{$order->id}/update" : "/ERP/purc
     .btn-remove-row { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; border-radius: 8px; width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; transition: 0.2s; }
     .btn-add-row { background: var(--c-blue-light); color: var(--c-blue); border: 1px solid #bfdbfe; padding: 8px 16px; border-radius: 10px; font-weight: 800; font-size: 0.9rem; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
     
-    .totals-box { background: #f8fafc; padding: 20px; border-radius: 12px; border: 1px solid #cbd5e1; margin-top: 20px; width: 350px; float: left; }
-    .totals-row { display: flex; justify-content: space-between; margin-bottom: 10px; font-weight: 700; color: #475569; font-size: 0.95rem; }
+    .totals-box { background: #f8fafc; padding: 20px; border-radius: 12px; border: 1px solid #cbd5e1; margin-top: 20px; width: 350px; float: <?= $isRtl ? 'left' : 'right' ?>; }
+    .totals-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; font-weight: 700; color: #475569; font-size: 0.95rem; }
     .totals-row.grand { border-top: 2px dashed #cbd5e1; padding-top: 10px; font-size: 1.2rem; color: var(--c-blue); font-weight: 900; }
     
     .sticky-footer { position: fixed; bottom: 0; left: 0; right: 0; background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(12px); border-top: 1px solid #e2e8f0; padding: 16px 32px; display: flex; justify-content: flex-end; gap: 16px; z-index: 100; clear: both;}
@@ -53,7 +124,7 @@ $actionUrl = $isEdit ? "/ERP/purchasing/orders/{$order->id}/update" : "/ERP/purc
 <div class="form-wrapper" dir="<?= $isRtl ? 'rtl' : 'ltr' ?>">
     <div class="form-header">
         <a href="/ERP/purchasing/orders" class="back-btn"><i class="ph-bold <?= $isRtl ? 'ph-arrow-right' : 'ph-arrow-left' ?>"></i></a>
-        <h2 class="form-title"><?= $isEdit ? 'تعديل أمر الشراء' : 'إصدار أمر شراء جديد (PO)' ?></h2>
+        <h2 class="form-title"><?= $isEdit ? $t['title_edit'] : $t['title_new'] ?></h2>
     </div>
 
     <?php if(isset($_SESSION['flash_err'])): ?>
@@ -62,12 +133,12 @@ $actionUrl = $isEdit ? "/ERP/purchasing/orders/{$order->id}/update" : "/ERP/purc
 
     <form action="<?= $actionUrl ?>" method="POST">
         <div class="panel-card">
-            <h3 class="panel-title"><i class="ph-duotone ph-info" style="color:var(--c-blue);"></i> بيانات أمر الشراء الأساسية</h3>
+            <h3 class="panel-title"><i class="ph-duotone ph-info" style="color:var(--c-blue);"></i> <?= $t['basic_info'] ?></h3>
             <div class="grid-2">
                 <div>
-                    <label class="input-label">المورد <span style="color:red">*</span></label>
+                    <label class="input-label"><?= $t['supplier'] ?> <span style="color:red">*</span></label>
                     <select name="supplier_id" class="form-control" required>
-                        <option value="">-- اختر المورد --</option>
+                        <option value=""><?= $t['select_supplier'] ?></option>
                         <?php foreach($suppliers ?? [] as $s): ?>
                             <option value="<?= $s->id ?>" <?= ($isEdit && $order->supplier_id == $s->id) ? 'selected' : '' ?>>
                                 <?= htmlspecialchars($s->name_ar) ?> <?= !empty($s->code) ? "({$s->code})" : '' ?>
@@ -76,28 +147,28 @@ $actionUrl = $isEdit ? "/ERP/purchasing/orders/{$order->id}/update" : "/ERP/purc
                     </select>
                 </div>
                 <div>
-                    <label class="input-label">رقم الـ PO (يولد تلقائياً إن تُرك فارغاً)</label>
+                    <label class="input-label"><?= $t['po_number'] ?></label>
                     <input type="text" name="po_number" class="form-control" style="font-family:monospace; color:var(--c-blue); font-weight:bold;" value="<?= $isEdit ? htmlspecialchars($order->po_number) : '' ?>" <?= $isEdit ? 'readonly' : '' ?>>
                 </div>
             </div>
             <div class="grid-3" style="margin-top: 24px;">
                 <div>
-                    <label class="input-label">تاريخ الإصدار</label>
+                    <label class="input-label"><?= $t['order_date'] ?></label>
                     <input type="date" name="order_date" class="form-control" value="<?= $isEdit ? htmlspecialchars($order->order_date) : date('Y-m-d') ?>" required>
                 </div>
                 <div>
-                    <label class="input-label">تاريخ التوريد المتوقع <span style="color:red">*</span></label>
+                    <label class="input-label"><?= $t['delivery_date'] ?> <span style="color:red">*</span></label>
                     <input type="date" name="delivery_date" class="form-control" value="<?= $isEdit ? htmlspecialchars($order->delivery_date) : '' ?>" required>
                 </div>
                 <div>
-                    <label class="input-label">حالة الأمر</label>
+                    <label class="input-label"><?= $t['status'] ?></label>
                     <select name="status" class="form-control" style="font-weight: 800;">
                         <?php $st = $isEdit ? $order->status : 'draft'; ?>
-                        <option value="draft" <?= $st=='draft' ? 'selected' : '' ?>>مسودة</option>
-                        <option value="sent" <?= $st=='sent' ? 'selected' : '' ?>>مُرسل للمورد</option>
-                        <option value="partially_received" <?= $st=='partially_received' ? 'selected' : '' ?>>مستلم جزئياً</option>
-                        <option value="completed" <?= $st=='completed' ? 'selected' : '' ?>>مكتمل (تم الاستلام)</option>
-                        <option value="cancelled" <?= $st=='cancelled' ? 'selected' : '' ?>>ملغي</option>
+                        <option value="draft" <?= $st=='draft' ? 'selected' : '' ?>><?= $t['status_draft'] ?></option>
+                        <option value="sent" <?= $st=='sent' ? 'selected' : '' ?>><?= $t['status_sent'] ?></option>
+                        <option value="partially_received" <?= $st=='partially_received' ? 'selected' : '' ?>><?= $t['status_partially_received'] ?></option>
+                        <option value="completed" <?= $st=='completed' ? 'selected' : '' ?>><?= $t['status_completed'] ?></option>
+                        <option value="cancelled" <?= $st=='cancelled' ? 'selected' : '' ?>><?= $t['status_cancelled'] ?></option>
                     </select>
                 </div>
             </div>
@@ -105,19 +176,19 @@ $actionUrl = $isEdit ? "/ERP/purchasing/orders/{$order->id}/update" : "/ERP/purc
 
         <div class="panel-card">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                <h3 class="panel-title" style="margin:0; border:none; padding:0;"><i class="ph-duotone ph-list-numbers" style="color:var(--c-blue);"></i> الأصناف والتسعير</h3>
-                <button type="button" onclick="addRow()" class="btn-add-row"><i class="ph-bold ph-plus"></i> إضافة صنف</button>
+                <h3 class="panel-title" style="margin:0; border:none; padding:0;"><i class="ph-duotone ph-list-numbers" style="color:var(--c-blue);"></i> <?= $t['items_pricing'] ?></h3>
+                <button type="button" onclick="addRow()" class="btn-add-row"><i class="ph-bold ph-plus"></i> <?= $t['add_item'] ?></button>
             </div>
             
             <table class="items-table" id="itemsTable">
                 <thead>
                     <tr>
-                        <th style="width: 28%;">الصنف (الكود والاسم)</th>
-                        <th style="width: 27%;">الوصف <span style="color:red">*</span></th>
-                        <th style="width: 12%; text-align: center;">الكمية</th>
-                        <th style="width: 15%; text-align: center;">سعر الوحدة</th>
-                        <th style="width: 12%; text-align: center;">الإجمالي</th>
-                        <th style="width: 6%; text-align: center;">إزالة</th>
+                        <th style="width: 28%;"><?= $t['col_prod'] ?></th>
+                        <th style="width: 27%;"><?= $t['col_desc'] ?> <span style="color:red">*</span></th>
+                        <th style="width: 12%; text-align: center;"><?= $t['col_qty'] ?></th>
+                        <th style="width: 15%; text-align: center;"><?= $t['col_price'] ?></th>
+                        <th style="width: 12%; text-align: center;"><?= $t['col_total'] ?></th>
+                        <th style="width: 6%; text-align: center;"><?= $t['col_remove'] ?></th>
                     </tr>
                 </thead>
                 <tbody id="itemsBody">
@@ -125,7 +196,7 @@ $actionUrl = $isEdit ? "/ERP/purchasing/orders/{$order->id}/update" : "/ERP/purc
                         <tr>
                             <td>
                                 <select name="product_id[]" class="form-control">
-                                    <option value="">-- غير مسجل --</option>
+                                    <option value=""><?= $t['unregistered'] ?></option>
                                     <?php foreach($products ?? [] as $p): ?>
                                         <option value="<?= $p->id ?>" <?= $item->product_id == $p->id ? 'selected' : '' ?>>
                                             <?= htmlspecialchars($p->code) ?><?= !empty($p->name) ? ' - ' . htmlspecialchars($p->name) : '' ?>
@@ -143,28 +214,28 @@ $actionUrl = $isEdit ? "/ERP/purchasing/orders/{$order->id}/update" : "/ERP/purc
                 </tbody>
             </table>
 
-            <div style="display:flex; justify-content:space-between; margin-top: 24px;">
-                <div style="width: 50%;">
-                    <label class="input-label">ملاحظات للمورد وشروط الدفع</label>
+            <div style="display:flex; justify-content:space-between; margin-top: 24px; flex-wrap:wrap; gap:16px;">
+                <div style="flex: 1; min-width:280px;">
+                    <label class="input-label"><?= $t['notes_label'] ?></label>
                     <textarea name="notes" class="form-control" rows="5"><?= $isEdit ? htmlspecialchars($order->notes ?? '') : '' ?></textarea>
                 </div>
                 
                 <div class="totals-box">
                     <div class="totals-row">
-                        <span>الإجمالي الفرعي (Subtotal):</span>
+                        <span><?= $t['subtotal'] ?></span>
                         <span id="txtSubtotal">0.00</span>
                     </div>
                     <div class="totals-row">
-                        <span>الخصم (Discount):</span>
-                        <span><input type="number" step="0.01" name="discount_amount" id="inpDiscount" class="form-control" style="width: 100px; padding:4px; text-align:end;" value="<?= $isEdit ? $order->discount_amount : '0.00' ?>" oninput="calcTotals()"></span>
+                        <span><?= $t['discount'] ?></span>
+                        <span><input type="number" step="0.01" name="discount_amount" id="inpDiscount" class="form-control" style="width: 110px; padding:4px; text-align:end;" value="<?= $isEdit ? $order->discount_amount : '0.00' ?>" oninput="calcTotals()"></span>
                     </div>
                     <div class="totals-row">
-                        <span>الضريبة المضافة (Tax):</span>
-                        <span><input type="number" step="0.01" name="tax_amount" id="inpTax" class="form-control" style="width: 100px; padding:4px; text-align:end;" value="<?= $isEdit ? $order->tax_amount : '0.00' ?>" oninput="calcTotals()"></span>
+                        <span><?= $t['tax'] ?></span>
+                        <span><input type="number" step="0.01" name="tax_amount" id="inpTax" class="form-control" style="width: 110px; padding:4px; text-align:end;" value="<?= $isEdit ? $order->tax_amount : '0.00' ?>" oninput="calcTotals()"></span>
                     </div>
                     <div class="totals-row grand">
-                        <span>الصافي المطلوب (Total):</span>
-                        <span id="txtGrandTotal">0.00</span>
+                        <span><?= $t['grand_total'] ?></span>
+                        <div><span id="txtGrandTotal">0.00</span> <span style="font-size:0.8rem; color:#64748b;"><?= $currency ?></span></div>
                     </div>
                 </div>
             </div>
@@ -172,8 +243,8 @@ $actionUrl = $isEdit ? "/ERP/purchasing/orders/{$order->id}/update" : "/ERP/purc
         </div>
 
         <div class="sticky-footer">
-            <a href="/ERP/purchasing/orders" class="btn-cancel">إلغاء وتراجع</a>
-            <button type="submit" class="btn-submit"><i class="ph-bold ph-floppy-disk"></i> <?= $isEdit ? 'تحديث الأمر' : 'إصدار أمر الشراء' ?></button>
+            <a href="/ERP/purchasing/orders" class="btn-cancel"><?= $t['cancel'] ?></a>
+            <button type="submit" class="btn-submit"><i class="ph-bold ph-floppy-disk"></i> <?= $isEdit ? $t['update'] : $t['save'] ?></button>
         </div>
     </form>
 </div>
@@ -182,7 +253,7 @@ $actionUrl = $isEdit ? "/ERP/purchasing/orders/{$order->id}/update" : "/ERP/purc
     <tr>
         <td>
             <select name="product_id[]" class="form-control">
-                <option value="">-- غير مسجل --</option>
+                <option value=""><?= $t['unregistered'] ?></option>
                 <?php foreach($products ?? [] as $p): ?>
                     <option value="<?= $p->id ?>">
                         <?= htmlspecialchars($p->code) ?><?= !empty($p->name) ? ' - ' . htmlspecialchars($p->name) : '' ?>
@@ -190,7 +261,7 @@ $actionUrl = $isEdit ? "/ERP/purchasing/orders/{$order->id}/update" : "/ERP/purc
                 <?php endforeach; ?>
             </select>
         </td>
-        <td><input type="text" name="description[]" class="form-control" placeholder="اكتب الوصف..." required></td>
+        <td><input type="text" name="description[]" class="form-control" required></td>
         <td><input type="number" step="0.01" name="quantity[]" class="form-control row-qty" style="text-align:center; font-weight:700;" value="1.00" required oninput="calcTotals()"></td>
         <td><input type="number" step="0.01" name="unit_price[]" class="form-control row-price" style="text-align:center; font-family:monospace;" value="0.00" required oninput="calcTotals()"></td>
         <td><input type="text" class="form-control row-total" style="text-align:center; font-family:monospace; background:#f1f5f9; color:var(--c-blue); font-weight:bold;" value="0.00" readonly></td>

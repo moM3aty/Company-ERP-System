@@ -66,23 +66,25 @@ if ($db) {
 
 $t = [
     'ar' => [
+        'system_tag' => 'نظام إدارة المؤسسات', 'op_systems' => 'الأنظمة التشغيلية', 'admin_fin_systems' => 'الأنظمة الإدارية والمالية',
         'dashboard' => 'لوحة القيادة', 'workspace' => 'مساحة العمل', 'approvals' => 'موافقاتي',
         'crm_sales' => 'المبيعات والعملاء', 'crm_dashboard' => 'شاشة المبيعات', 'leads' => 'العملاء المحتملين', 'customers' => 'سجل العملاء', 'quotations' => 'عروض الأسعار', 'sales_orders' => 'أوامر البيع', 'delivery_notes' => 'أذونات الصرف', 'sales_invoices' => 'فواتير المبيعات', 'sales_receipts' => 'سندات القبض', 'sales_returns' => 'مرتجعات المبيعات', 'price_lists' => 'قوائم الأسعار', 'sales_reps' => 'المناديب', 'customer_statements' => 'كشوف الحسابات', 'sales_contracts' => 'العقود',
         'purchasing' => 'المشتريات والموردين', 'pur_dashboard' => 'شاشة المشتريات', 'suppliers' => 'سجل الموردين', 'supplier_evaluations' => 'تقييم الموردين', 'supplier_price_lists' => 'قوائم الأسعار', 'pur_contracts' => 'العقود', 'pr' => 'طلبات الشراء', 'rfq' => 'عروض الأسعار', 'po' => 'أوامر الشراء', 'grn' => 'استلام البضاعة', 'landed_costs' => 'التكاليف الجمركية', 'pur_invoices' => 'فواتير المشتريات', 'pur_returns' => 'مرتجعات الموردين', 'supplier_statements' => 'كشوف الموردين',
         'projects' => 'المشاريع والمقاولات', 'projects_dashboard' => 'لوحة المشاريع', 'projects_list' => 'سجل المشاريع', 'milestones' => 'المراحل والمهام', 'project_invoices' => 'المستخلصات والفواتير', 'project_costs' => 'تكاليف ومصروفات الموقع', 'project_contracts' => 'عقود المشاريع',
-        'inventory' => 'المخازن والمستودعات', 'inv_dashboard' => 'لوحة المخازن', 'products' => 'دليل الأصناف', 'categories' => 'فئات الأصناف', 'warehouses' => 'المستودعات', 'stock_transfers' => 'التحويلات المخزنية', 'stock_ledger' => 'حركات المخزون',
-        'accounting' => 'الحسابات والمالية', 'acc_dashboard' => 'الشاشة المالية', 'chart_accounts' => 'دليل الحسابات', 'journal_entries' => 'قيود اليومية', 'cost_centers' => 'مراكز التكلفة', 'fiscal_periods' => 'الفترات المالية', 'taxes' => 'الضرائب', 'general_ledger' => 'دفتر الأستاذ', 'trial_balance' => 'ميزان المراجعة',
+        'inventory' => 'المخازن والمستودعات', 'inv_dashboard' => 'لوحة المخازن', 'products' => 'دليل الأصناف', 'categories' => 'فئات الأصناف', 'warehouses' => 'المستودعات', 'stock_transfers' => 'التحويلات المخزنية', 'stock_returns' => 'مرتجعات المخزون', 'stock_adjustments' => 'تسويات وجرد المخزون', 'stock_ledger' => 'حركات المخزون',
+        'accounting' => 'الحسابات والمالية', 'acc_dashboard' => 'الشاشة المالية', 'chart_accounts' => 'دليل الحسابات', 'journal_entries' => 'قيود اليومية', 'cost_centers' => 'مراكز التكلفة', 'fixed_assets' => 'إدارة الأصول الثابتة والإهلاكات', 'budgets' => 'الموازنات التقديرية والانحرافات', 'bank_reconciliation' => 'التسويات والمطابقات البنكية', 'fiscal_periods' => 'الفترات المالية', 'taxes' => 'الضرائب', 'financial_reports' => 'القوائم والتقارير المالية', 'income_statement' => 'قائمة الدخل (P&L)', 'balance_sheet' => 'الميزانية العمومية', 'cash_flow' => 'التدفقات النقدية', 'vat_return' => 'الإقرار الضريبي', 'general_ledger' => 'دفتر الأستاذ', 'trial_balance' => 'ميزان المراجعة',
         'treasury' => 'الخزانة والبنوك', 'treasury_dashboard' => 'لوحة الخزانة', 'bank_accounts' => 'الحسابات البنكية', 'receipt_vouchers' => 'سندات القبض', 'payment_vouchers' => 'سندات الصرف', 'internal_transfers' => 'التحويلات الداخلية', 'petty_cash' => 'العهد المالية', 'cheques' => 'حركة الشيكات', 'cash_book' => 'دفتر الصندوق',
         'hr' => 'الموارد البشرية والرواتب', 'hr_dashboard' => 'شاشة الـ HR', 'departments' => 'الهيكل التنظيمي', 'designations' => 'الدرجات الوظيفية', 'employees' => 'دليل الموظفين', 'emp_contracts' => 'عقود الموظفين', 'attendance' => 'الحضور والانصراف', 'shifts' => 'الورديات', 'leaves' => 'الإجازات', 'payroll' => 'مسيرات الرواتب', 'salary_components' => 'مكونات الراتب', 'appraisals' => 'التقييمات', 'recruitment' => 'التوظيف', 'hr_documents' => 'وثائق الموظفين',
         'admin' => 'إدارة النظام والإعدادات', 'companies' => 'دليل الشركات', 'branches' => 'الفروع والمراكز', 'roles' => 'الأدوار والصلاحيات', 'users' => 'حسابات المستخدمين', 'settings' => 'الإعدادات العامة', 'audit_logs' => 'سجل حركات النظام', 'backups' => 'النسخ الاحتياطي والصيانة',
     ],
     'en' => [
+        'system_tag' => 'Enterprise System', 'op_systems' => 'Operational Systems', 'admin_fin_systems' => 'Admin & Financial Systems',
         'dashboard' => 'Main Dashboard', 'workspace' => 'My Workspace', 'approvals' => 'My Approvals',
         'crm_sales' => 'Sales & CRM', 'crm_dashboard' => 'Sales Dashboard', 'leads' => 'Leads', 'customers' => 'Customers', 'quotations' => 'Quotations', 'sales_orders' => 'Sales Orders', 'delivery_notes' => 'Delivery Notes', 'sales_invoices' => 'Sales Invoices', 'sales_receipts' => 'Sales Receipts', 'sales_returns' => 'Sales Returns', 'price_lists' => 'Price Lists', 'sales_reps' => 'Sales Reps', 'customer_statements' => 'Customer Statements', 'sales_contracts' => 'Sales Contracts',
         'purchasing' => 'Purchasing', 'pur_dashboard' => 'Purchasing Dashboard', 'suppliers' => 'Suppliers', 'supplier_evaluations' => 'Supplier Evaluations', 'supplier_price_lists' => 'Supplier Catalogs', 'pur_contracts' => 'Purchase Contracts', 'pr' => 'Purchase Reqs', 'rfq' => 'Requests for Quote', 'po' => 'Purchase Orders', 'grn' => 'Goods Receipts', 'landed_costs' => 'Landed Costs', 'pur_invoices' => 'Purchase Invoices', 'pur_returns' => 'Purchase Returns', 'supplier_statements' => 'Supplier Statements',
         'projects' => 'Projects & Contracting', 'projects_dashboard' => 'Projects Dashboard', 'projects_list' => 'Projects Directory', 'milestones' => 'Milestones & Tasks', 'project_invoices' => 'Progress Invoices', 'project_costs' => 'Project Costing', 'project_contracts' => 'Project Contracts',
-        'inventory' => 'Inventory', 'inv_dashboard' => 'Inventory Dashboard', 'products' => 'Products', 'categories' => 'Categories', 'warehouses' => 'Warehouses', 'stock_transfers' => 'Stock Transfers', 'stock_ledger' => 'Stock Ledger',
-        'accounting' => 'Accounting', 'acc_dashboard' => 'Acc. Dashboard', 'chart_accounts' => 'Chart of Accounts', 'journal_entries' => 'Journal Entries', 'cost_centers' => 'Cost Centers', 'fiscal_periods' => 'Fiscal Periods', 'taxes' => 'Taxes', 'general_ledger' => 'General Ledger', 'trial_balance' => 'Trial Balance',
+        'inventory' => 'Inventory', 'inv_dashboard' => 'Inventory Dashboard', 'products' => 'Products', 'categories' => 'Categories', 'warehouses' => 'Warehouses', 'stock_transfers' => 'Stock Transfers', 'stock_returns' => 'Stock Returns', 'stock_adjustments' => 'Stock Adjustments & Count', 'stock_ledger' => 'Stock Ledger',
+        'accounting' => 'Accounting', 'acc_dashboard' => 'Acc. Dashboard', 'chart_accounts' => 'Chart of Accounts', 'journal_entries' => 'Journal Entries', 'cost_centers' => 'Cost Centers', 'fixed_assets' => 'Fixed Assets & Depreciation', 'budgets' => 'Budgets & Variances', 'bank_reconciliation' => 'Bank Reconciliation', 'fiscal_periods' => 'Fiscal Periods', 'taxes' => 'Taxes', 'financial_reports' => 'Financial Reports & Statements', 'income_statement' => 'Income Statement (P&L)', 'balance_sheet' => 'Balance Sheet', 'cash_flow' => 'Cash Flow Statement', 'vat_return' => 'VAT Return', 'general_ledger' => 'General Ledger', 'trial_balance' => 'Trial Balance',
         'treasury' => 'Treasury & Banking', 'treasury_dashboard' => 'Treasury Dashboard', 'bank_accounts' => 'Bank Accounts', 'receipt_vouchers' => 'Receipt Vouchers', 'payment_vouchers' => 'Payment Vouchers', 'internal_transfers' => 'Internal Transfers', 'petty_cash' => 'Petty Cash', 'cheques' => 'Cheque Management', 'cash_book' => 'Cash Book Report',
         'hr' => 'HR & Payroll', 'hr_dashboard' => 'HR Dashboard', 'departments' => 'Departments', 'designations' => 'Designations', 'employees' => 'Employees Directory', 'emp_contracts' => 'Employment Contracts', 'attendance' => 'Attendance Logs', 'shifts' => 'Shifts & Schedules', 'leaves' => 'Leave Requests', 'payroll' => 'Payroll', 'salary_components' => 'Salary Structure', 'appraisals' => 'Performance Appraisals', 'recruitment' => 'Recruitment', 'hr_documents' => 'Employee Documents',
         'admin' => 'Administration & Settings', 'companies' => 'Companies', 'branches' => 'Branches', 'roles' => 'Roles & Permissions', 'users' => 'Users Directory', 'settings' => 'System Settings', 'audit_logs' => 'Audit & Security Logs', 'backups' => 'Backups & Maintenance',
@@ -106,7 +108,7 @@ $t = [
         </div>
         <div class="branding-info">
             <span class="company-name"><?= htmlspecialchars($companyName) ?></span>
-            <span class="system-tag">Enterprise System</span>
+            <span class="system-tag"><?= $t['system_tag'] ?></span>
         </div>
         <button class="mobile-close-btn" onclick="closeSidebarMobile()">
             <i class="ph-bold ph-x"></i>
@@ -371,7 +373,7 @@ $t = [
             </a>
         </div>
 
-        <div class="section-divider">الأنظمة التشغيلية</div>
+        <div class="section-divider"><?= $t['op_systems'] ?></div>
 
         <!-- المبيعات والعملاء -->
         <?php if($canViewSales || $isSuperAdmin): $salesActive = $isActiveHub(['/sales', '/crm']); ?>
@@ -470,14 +472,14 @@ $t = [
                     <a href="<?= $baseUrl ?>/inventory/warehouses" class="nav-link <?= $isActiveLink('/inventory/warehouses') ? 'active' : '' ?>"><span><?= $t['warehouses'] ?></span></a>
                     <a href="<?= $baseUrl ?>/inventory/stock/transfers" class="nav-link <?= $isActiveLink('/inventory/stock/transfers') ? 'active' : '' ?>"><span><?= $t['stock_transfers'] ?></span></a>
                     <a href="<?= $baseUrl ?>/inventory/delivery-notes" class="nav-link <?= $isActiveLink('/inventory/delivery-notes') ? 'active' : '' ?>"><span><?= $t['delivery_notes'] ?></span></a>
-                    <a href="<?= $baseUrl ?>/inventory/returns" class="nav-link <?= $isActiveLink('/inventory/returns') ? 'active' : '' ?>"><span>مرتجعات المخزون</span></a>
-                    <a href="<?= $baseUrl ?>/inventory/adjustments" class="nav-link <?= $isActiveLink('/inventory/adjustments') ? 'active' : '' ?>"><span>تسويات وجرد المخزون</span></a>
+                    <a href="<?= $baseUrl ?>/inventory/returns" class="nav-link <?= $isActiveLink('/inventory/returns') ? 'active' : '' ?>"><span><?= $t['stock_returns'] ?></span></a>
+                    <a href="<?= $baseUrl ?>/inventory/adjustments" class="nav-link <?= $isActiveLink('/inventory/adjustments') ? 'active' : '' ?>"><span><?= $t['stock_adjustments'] ?></span></a>
                     <a href="<?= $baseUrl ?>/inventory/stock/ledger" class="nav-link <?= $isActiveLink('/inventory/stock/ledger') ? 'active' : '' ?>"><span><?= $t['stock_ledger'] ?></span></a>
                 </div>
             </div>
         <?php endif; ?>
 
-        <div class="section-divider">الأنظمة الإدارية والمالية</div>
+        <div class="section-divider"><?= $t['admin_fin_systems'] ?></div>
 
         <!-- الحسابات والمالية -->
         <?php if($canViewAccounting || $isSuperAdmin): $accActive = $isActiveHub('/accounting'); ?>
@@ -494,17 +496,17 @@ $t = [
                     <a href="<?= $baseUrl ?>/accounting/chart-of-accounts" class="nav-link <?= $isActiveLink('/accounting/chart-of-accounts') ? 'active' : '' ?>"><span><?= $t['chart_accounts'] ?></span></a>
                     <a href="<?= $baseUrl ?>/accounting/journal-entries" class="nav-link <?= $isActiveLink('/accounting/journal-entries') ? 'active' : '' ?>"><span><?= $t['journal_entries'] ?></span></a>
                     <a href="<?= $baseUrl ?>/accounting/cost-centers" class="nav-link <?= $isActiveLink('/accounting/cost-centers') ? 'active' : '' ?>"><span><?= $t['cost_centers'] ?></span></a>
-                    <a href="<?= $baseUrl ?>/accounting/fixed-assets" class="nav-link <?= $isActiveLink('/accounting/fixed-assets') ? 'active' : '' ?>"><span>إدارة الأصول الثابتة والإهلاكات</span></a>
-                    <a href="<?= $baseUrl ?>/accounting/budgets" class="nav-link <?= $isActiveLink('/accounting/budgets') ? 'active' : '' ?>"><span>الموازنات التقديرية والانحرافات</span></a>
-                    <a href="<?= $baseUrl ?>/accounting/bank-reconciliation" class="nav-link <?= $isActiveLink('/accounting/bank-reconciliation') ? 'active' : '' ?>"><span>التسويات والمطابقات البنكية</span></a>
+                    <a href="<?= $baseUrl ?>/accounting/fixed-assets" class="nav-link <?= $isActiveLink('/accounting/fixed-assets') ? 'active' : '' ?>"><span><?= $t['fixed_assets'] ?></span></a>
+                    <a href="<?= $baseUrl ?>/accounting/budgets" class="nav-link <?= $isActiveLink('/accounting/budgets') ? 'active' : '' ?>"><span><?= $t['budgets'] ?></span></a>
+                    <a href="<?= $baseUrl ?>/accounting/bank-reconciliation" class="nav-link <?= $isActiveLink('/accounting/bank-reconciliation') ? 'active' : '' ?>"><span><?= $t['bank_reconciliation'] ?></span></a>
                     <a href="<?= $baseUrl ?>/accounting/fiscal-periods" class="nav-link <?= $isActiveLink('/accounting/fiscal-periods') ? 'active' : '' ?>"><span><?= $t['fiscal_periods'] ?></span></a>
                     <a href="<?= $baseUrl ?>/accounting/taxes" class="nav-link <?= $isActiveLink('/accounting/taxes') ? 'active' : '' ?>"><span><?= $t['taxes'] ?></span></a>
                     
-                    <div style="font-size: 0.7rem; color: #64748b; font-weight: 800; margin: 10px 0 4px 0;">القوائم والتقارير المالية</div>
-                    <a href="<?= $baseUrl ?>/accounting/reports/income-statement" class="nav-link <?= $isActiveLink('/accounting/reports/income-statement') ? 'active' : '' ?>"><span>قائمة الدخل (P&L)</span></a>
-                    <a href="<?= $baseUrl ?>/accounting/reports/balance-sheet" class="nav-link <?= $isActiveLink('/accounting/reports/balance-sheet') ? 'active' : '' ?>"><span>الميزانية العمومية</span></a>
-                    <a href="<?= $baseUrl ?>/accounting/reports/cash-flow" class="nav-link <?= $isActiveLink('/accounting/reports/cash-flow') ? 'active' : '' ?>"><span>التدفقات النقدية</span></a>
-                    <a href="<?= $baseUrl ?>/accounting/reports/vat-return" class="nav-link <?= $isActiveLink('/accounting/reports/vat-return') ? 'active' : '' ?>"><span>الإقرار الضريبي</span></a>
+                    <div style="font-size: 0.7rem; color: #64748b; font-weight: 800; margin: 10px 0 4px 0;"><?= $t['financial_reports'] ?></div>
+                    <a href="<?= $baseUrl ?>/accounting/reports/income-statement" class="nav-link <?= $isActiveLink('/accounting/reports/income-statement') ? 'active' : '' ?>"><span><?= $t['income_statement'] ?></span></a>
+                    <a href="<?= $baseUrl ?>/accounting/reports/balance-sheet" class="nav-link <?= $isActiveLink('/accounting/reports/balance-sheet') ? 'active' : '' ?>"><span><?= $t['balance_sheet'] ?></span></a>
+                    <a href="<?= $baseUrl ?>/accounting/reports/cash-flow" class="nav-link <?= $isActiveLink('/accounting/reports/cash-flow') ? 'active' : '' ?>"><span><?= $t['cash_flow'] ?></span></a>
+                    <a href="<?= $baseUrl ?>/accounting/reports/vat-return" class="nav-link <?= $isActiveLink('/accounting/reports/vat-return') ? 'active' : '' ?>"><span><?= $t['vat_return'] ?></span></a>
                     <a href="<?= $baseUrl ?>/accounting/reports/ledger" class="nav-link <?= $isActiveLink('/accounting/reports/ledger') ? 'active' : '' ?>"><span><?= $t['general_ledger'] ?></span></a>
                     <a href="<?= $baseUrl ?>/accounting/reports/trial-balance" class="nav-link <?= $isActiveLink('/accounting/reports/trial-balance') ? 'active' : '' ?>"><span><?= $t['trial_balance'] ?></span></a>
                 </div>

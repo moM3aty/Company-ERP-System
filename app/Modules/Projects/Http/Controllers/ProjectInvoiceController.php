@@ -18,10 +18,7 @@ class ProjectInvoiceController extends Controller
 
     public function __construct()
     {
-        ini_set('display_errors', 1);
-        ini_set('display_startup_errors', 1);
-        error_reporting(E_ALL);
-
+        ini_set('display_errors', 0);
         global $basePath, $app;
         $this->basePath = $basePath ?? dirname(__DIR__, 4);
         if ($app && $app->has(PDO::class)) {
@@ -42,6 +39,10 @@ class ProjectInvoiceController extends Controller
 
     public function index(Request $request, Response $response): Response
     {
+        if (session_status() === PHP_SESSION_NONE) session_start();
+        $companyId = $_SESSION['company_id'] ?? 1;
+        $branchId  = $_SESSION['branch_id'] ?? 0;
+
         $uri = $_SERVER['REQUEST_URI'] ?? '';
         if (preg_match('#/projects/invoices/(\d+)/edit#', $uri, $m)) return $this->edit($request, $response, (int)$m[1]);
         if (preg_match('#/projects/invoices/(\d+)/update#', $uri, $m)) return $this->update($request, $response, (int)$m[1]);
@@ -71,15 +72,21 @@ class ProjectInvoiceController extends Controller
 
         if ($this->db) {
             try {
-                $projects = $this->db->query("SELECT id, code, name_ar FROM projects ORDER BY id DESC")->fetchAll(PDO::FETCH_OBJ) ?: [];
+                $bCond = $branchId > 0 ? " AND (branch_id = $branchId OR branch_id IS NULL OR branch_id = 0)" : "";
+                $projects = $this->db->query("SELECT id, code, COALESCE(name_ar, name_en) as name_ar FROM projects WHERE company_id = $companyId $bCond ORDER BY id DESC")->fetchAll(PDO::FETCH_OBJ) ?: [];
 
-                $where = ["1=1"];
-                $params = [];
+                $where = ["i.company_id = ?"];
+                $params = [$companyId];
+
+                if ($branchId > 0) {
+                    $where[] = "(i.branch_id = ? OR i.branch_id IS NULL OR i.branch_id = 0)";
+                    $params[] = $branchId;
+                }
 
                 if ($search !== '') {
-                    $where[] = "(i.invoice_number LIKE ? OR i.description LIKE ? OR p.name_ar LIKE ? OR c.name_ar LIKE ?)";
+                    $where[] = "(i.invoice_number LIKE ? OR i.description LIKE ? OR p.name_ar LIKE ? OR p.name_en LIKE ? OR c.name_ar LIKE ?)";
                     $like = "%{$search}%";
-                    $params = array_merge($params, [$like, $like, $like, $like]);
+                    $params = array_merge($params, [$like, $like, $like, $like, $like]);
                 }
 
                 if ($projectId !== '') {
@@ -111,7 +118,7 @@ class ProjectInvoiceController extends Controller
                 $totalPages = max(1, ceil($totalCount / $limit));
 
                 $stmt = $this->db->prepare("
-                    SELECT i.*, p.name_ar as project_name, p.code as project_code, c.name_ar as customer_name
+                    SELECT i.*, COALESCE(p.name_ar, p.name_en) as project_name, p.code as project_code, c.name_ar as customer_name
                     FROM project_invoices i
                     LEFT JOIN projects p ON i.project_id = p.id
                     LEFT JOIN customers c ON i.customer_id = c.id
@@ -122,17 +129,28 @@ class ProjectInvoiceController extends Controller
                 $stmt->execute($params);
                 $invoices = $stmt->fetchAll(PDO::FETCH_OBJ) ?: [];
 
-                $statsData = $this->db->query("
+                foreach ($invoices as $inv) {
+                    $inv->net_amount = convert_amount($inv->net_amount);
+                    $inv->paid_amount = convert_amount($inv->paid_amount);
+                }
+
+                $statsStmt = $this->db->prepare("
                     SELECT 
                         COUNT(*) as total_invoices,
                         COALESCE(SUM(net_amount), 0) as total_net_amount,
                         COALESCE(SUM(paid_amount), 0) as total_paid,
                         COALESCE(SUM(net_amount - paid_amount), 0) as total_remaining,
                         SUM(IF(status IN ('approved','partially_paid','paid'), 1, 0)) as approved_count
-                    FROM project_invoices
-                ")->fetch(PDO::FETCH_OBJ);
+                    FROM project_invoices i
+                    WHERE i.company_id = ? " . ($branchId > 0 ? " AND (i.branch_id = $branchId OR i.branch_id IS NULL OR i.branch_id = 0)" : "") . "
+                ");
+                $statsStmt->execute([$companyId]);
+                $statsData = $statsStmt->fetch(PDO::FETCH_OBJ);
                 if ($statsData) {
                     $stats = $statsData;
+                    $stats->total_net_amount = convert_amount($stats->total_net_amount);
+                    $stats->total_paid = convert_amount($stats->total_paid);
+                    $stats->total_remaining = convert_amount($stats->total_remaining);
                 }
 
             } catch (Throwable $e) {
@@ -157,6 +175,10 @@ class ProjectInvoiceController extends Controller
 
     public function create(Request $request, Response $response): Response
     {
+        if (session_status() === PHP_SESSION_NONE) session_start();
+        $companyId = $_SESSION['company_id'] ?? 1;
+        $branchId  = $_SESSION['branch_id'] ?? 0;
+
         $invoice = null; 
         $projects = [];
         $customers = [];
@@ -164,9 +186,10 @@ class ProjectInvoiceController extends Controller
 
         if ($this->db) {
             try {
-                $projects = $this->db->query("SELECT id, code, name_ar, customer_id, contract_value FROM projects ORDER BY id DESC")->fetchAll(PDO::FETCH_OBJ) ?: [];
-                $customers = $this->db->query("SELECT id, name_ar FROM customers ORDER BY name_ar ASC")->fetchAll(PDO::FETCH_OBJ) ?: [];
-                $nextSeq = (int)$this->db->query("SELECT COUNT(*) FROM project_invoices")->fetchColumn() + 1;
+                $bCond = $branchId > 0 ? " AND (branch_id = $branchId OR branch_id IS NULL OR branch_id = 0)" : "";
+                $projects = $this->db->query("SELECT id, code, COALESCE(name_ar, name_en) as name_ar, customer_id, contract_value FROM projects WHERE company_id = $companyId $bCond ORDER BY id DESC")->fetchAll(PDO::FETCH_OBJ) ?: [];
+                $customers = $this->db->query("SELECT id, name_ar FROM customers WHERE company_id = $companyId ORDER BY name_ar ASC")->fetchAll(PDO::FETCH_OBJ) ?: [];
+                $nextSeq = (int)$this->db->query("SELECT COUNT(*) FROM project_invoices WHERE company_id = $companyId")->fetchColumn() + 1;
                 $autoCode = 'INV-PRJ-' . date('Y') . '-' . str_pad($nextSeq, 4, '0', STR_PAD_LEFT);
             } catch (Throwable $e) {}
         }
@@ -183,12 +206,15 @@ class ProjectInvoiceController extends Controller
     {
         $data = $_POST;
         if (session_status() === PHP_SESSION_NONE) session_start();
+        $isAr = ($_SESSION['locale'] ?? 'ar') === 'ar';
+        $companyId = $_SESSION['company_id'] ?? 1;
+        $branchId  = $_SESSION['branch_id'] ?? 0;
 
         try {
-            if (!$this->db) throw new Exception("اتصال قاعدة البيانات غير متوفر.");
+            if (!$this->db) throw new Exception("Database connection unavailable.");
 
             if (empty($data['invoice_number']) || empty($data['project_id']) || empty($data['invoice_date'])) {
-                throw new Exception("يرجى تعبئة الحقول الأساسية للمستخلص/الفاتورة.");
+                throw new Exception($isAr ? "يرجى تعبئة الحقول الأساسية للمستخلص." : "Please fill required fields.");
             }
 
             $total = !empty($data['total_amount']) ? (float)$data['total_amount'] : 0.00;
@@ -196,7 +222,6 @@ class ProjectInvoiceController extends Controller
             $tax = !empty($data['tax_amount']) ? (float)$data['tax_amount'] : 0.00;
             $net = max(0, ($total - $deductions) + $tax);
 
-            // جلب العميل المعين للمشروع تلقائياً إن لم يحدد
             $customerId = !empty($data['customer_id']) ? (int)$data['customer_id'] : null;
             if (!$customerId) {
                 $pStmt = $this->db->prepare("SELECT customer_id FROM projects WHERE id = ?");
@@ -204,31 +229,38 @@ class ProjectInvoiceController extends Controller
                 $customerId = $pStmt->fetchColumn() ?: null;
             }
 
-            $stmt = $this->db->prepare("
-                INSERT INTO project_invoices 
-                (invoice_number, project_id, customer_id, invoice_date, due_date, period_start, period_end, invoice_type, total_amount, deductions_amount, tax_amount, net_amount, paid_amount, status, description, notes, created_by)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0.00, ?, ?, ?, ?)
-            ");
-            $stmt->execute([
-                trim($data['invoice_number']),
-                (int)$data['project_id'],
-                $customerId,
-                $data['invoice_date'],
-                !empty($data['due_date']) ? $data['due_date'] : null,
-                !empty($data['period_start']) ? $data['period_start'] : null,
-                !empty($data['period_end']) ? $data['period_end'] : null,
-                $data['invoice_type'] ?? 'progress_claim',
-                $total,
-                $deductions,
-                $tax,
-                $net,
-                $data['status'] ?? 'submitted',
-                trim($data['description'] ?? ''),
-                trim($data['notes'] ?? ''),
-                $_SESSION['user_id'] ?? 1
-            ]);
+            try {
+                $stmt = $this->db->prepare("
+                    INSERT INTO project_invoices 
+                    (company_id, branch_id, invoice_number, project_id, customer_id, invoice_date, due_date, period_start, period_end, invoice_type, total_amount, deductions_amount, tax_amount, net_amount, paid_amount, status, description, notes, created_by)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0.00, ?, ?, ?, ?)
+                ");
+                $stmt->execute([
+                    $companyId, $branchId,
+                    trim($data['invoice_number']), (int)$data['project_id'], $customerId,
+                    $data['invoice_date'], !empty($data['due_date']) ? $data['due_date'] : null,
+                    !empty($data['period_start']) ? $data['period_start'] : null,
+                    !empty($data['period_end']) ? $data['period_end'] : null,
+                    $data['invoice_type'] ?? 'progress_claim',
+                    $total, $deductions, $tax, $net,
+                    $data['status'] ?? 'submitted', trim($data['description'] ?? ''), trim($data['notes'] ?? ''), $_SESSION['user_id'] ?? 1
+                ]);
+            } catch (\PDOException $ex) {
+                $stmt = $this->db->prepare("
+                    INSERT INTO project_invoices 
+                    (invoice_number, project_id, customer_id, invoice_date, due_date, period_start, period_end, invoice_type, total_amount, deductions_amount, tax_amount, net_amount, paid_amount, status, description, notes, created_by)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0.00, ?, ?, ?, ?)
+                ");
+                $stmt->execute([
+                    trim($data['invoice_number']), (int)$data['project_id'], $customerId,
+                    $data['invoice_date'], !empty($data['due_date']) ? $data['due_date'] : null,
+                    !empty($data['period_start']) ? $data['period_start'] : null, !empty($data['period_end']) ? $data['period_end'] : null,
+                    $data['invoice_type'] ?? 'progress_claim', $total, $deductions, $tax, $net,
+                    $data['status'] ?? 'submitted', trim($data['description'] ?? ''), trim($data['notes'] ?? ''), $_SESSION['user_id'] ?? 1
+                ]);
+            }
 
-            $_SESSION['flash_msg'] = "تم إنشاء وتسجيل المستخلص/الفاتورة بنجاح.";
+            $_SESSION['flash_msg'] = $isAr ? "تم تسجيل المستخلص بنجاح." : "Claim saved successfully.";
         } catch (Throwable $e) {
             $_SESSION['flash_err'] = $e->getMessage();
             return new RedirectResponse('/ERP/projects/invoices/create');
@@ -241,6 +273,8 @@ class ProjectInvoiceController extends Controller
     {
         $id = $this->resolveId($id);
         if (session_status() === PHP_SESSION_NONE) session_start();
+        $companyId = $_SESSION['company_id'] ?? 1;
+        $branchId  = $_SESSION['branch_id'] ?? 0;
 
         $invoice = null;
         $projects = [];
@@ -248,16 +282,17 @@ class ProjectInvoiceController extends Controller
         $autoCode = '';
 
         try {
-            if (!$this->db) throw new Exception("اتصال قاعدة البيانات غير متوفر.");
+            if (!$this->db) throw new Exception("Database connection unavailable.");
 
-            $stmt = $this->db->prepare("SELECT * FROM project_invoices WHERE id = ?");
-            $stmt->execute([$id]);
+            $stmt = $this->db->prepare("SELECT * FROM project_invoices WHERE id = ? AND company_id = ?");
+            $stmt->execute([$id, $companyId]);
             $invoice = $stmt->fetch(PDO::FETCH_OBJ);
 
-            if (!$invoice) throw new Exception("بيانات المستخلص/الفاتورة غير موجودة.");
+            if (!$invoice) throw new Exception("المستخلص غير موجود.");
 
-            $projects = $this->db->query("SELECT id, code, name_ar FROM projects ORDER BY id DESC")->fetchAll(PDO::FETCH_OBJ) ?: [];
-            $customers = $this->db->query("SELECT id, name_ar FROM customers ORDER BY name_ar ASC")->fetchAll(PDO::FETCH_OBJ) ?: [];
+            $bCond = $branchId > 0 ? " AND (branch_id = $branchId OR branch_id IS NULL OR branch_id = 0)" : "";
+            $projects = $this->db->query("SELECT id, code, COALESCE(name_ar, name_en) as name_ar FROM projects WHERE company_id = $companyId $bCond ORDER BY id DESC")->fetchAll(PDO::FETCH_OBJ) ?: [];
+            $customers = $this->db->query("SELECT id, name_ar FROM customers WHERE company_id = $companyId ORDER BY name_ar ASC")->fetchAll(PDO::FETCH_OBJ) ?: [];
             $autoCode = $invoice->invoice_number;
 
         } catch (Throwable $e) {
@@ -278,9 +313,11 @@ class ProjectInvoiceController extends Controller
         $id = $this->resolveId($id);
         $data = $_POST;
         if (session_status() === PHP_SESSION_NONE) session_start();
+        $isAr = ($_SESSION['locale'] ?? 'ar') === 'ar';
+        $companyId = $_SESSION['company_id'] ?? 1;
 
         try {
-            if (!$this->db) throw new Exception("اتصال قاعدة البيانات غير متوفر.");
+            if (!$this->db) throw new Exception("Database error.");
 
             $total = !empty($data['total_amount']) ? (float)$data['total_amount'] : 0.00;
             $deductions = !empty($data['deductions_amount']) ? (float)$data['deductions_amount'] : 0.00;
@@ -291,28 +328,19 @@ class ProjectInvoiceController extends Controller
             $stmt = $this->db->prepare("
                 UPDATE project_invoices 
                 SET project_id = ?, customer_id = ?, invoice_date = ?, due_date = ?, period_start = ?, period_end = ?, invoice_type = ?, total_amount = ?, deductions_amount = ?, tax_amount = ?, net_amount = ?, paid_amount = ?, status = ?, description = ?, notes = ?
-                WHERE id = ?
+                WHERE id = ? AND company_id = ?
             ");
             $stmt->execute([
-                (int)$data['project_id'],
-                !empty($data['customer_id']) ? (int)$data['customer_id'] : null,
-                $data['invoice_date'],
-                !empty($data['due_date']) ? $data['due_date'] : null,
-                !empty($data['period_start']) ? $data['period_start'] : null,
-                !empty($data['period_end']) ? $data['period_end'] : null,
+                (int)$data['project_id'], !empty($data['customer_id']) ? (int)$data['customer_id'] : null,
+                $data['invoice_date'], !empty($data['due_date']) ? $data['due_date'] : null,
+                !empty($data['period_start']) ? $data['period_start'] : null, !empty($data['period_end']) ? $data['period_end'] : null,
                 $data['invoice_type'] ?? 'progress_claim',
-                $total,
-                $deductions,
-                $tax,
-                $net,
-                $paid,
-                $data['status'] ?? 'draft',
-                trim($data['description'] ?? ''),
-                trim($data['notes'] ?? ''),
-                $id
+                $total, $deductions, $tax, $net, $paid,
+                $data['status'] ?? 'draft', trim($data['description'] ?? ''), trim($data['notes'] ?? ''),
+                $id, $companyId
             ]);
 
-            $_SESSION['flash_msg'] = "تم تحديث بيانات المستخلص بنجاح.";
+            $_SESSION['flash_msg'] = $isAr ? "تم تحديث بيانات المستخلص." : "Claim updated.";
         } catch (Throwable $e) {
             $_SESSION['flash_err'] = $e->getMessage();
             return new RedirectResponse("/ERP/projects/invoices/{$id}/edit");
@@ -326,22 +354,23 @@ class ProjectInvoiceController extends Controller
         $id = $this->resolveId($id);
         $data = $_POST;
         if (session_status() === PHP_SESSION_NONE) session_start();
+        $isAr = ($_SESSION['locale'] ?? 'ar') === 'ar';
+        $companyId = $_SESSION['company_id'] ?? 1;
 
         try {
-            if (!$this->db) throw new Exception("اتصال قاعدة البيانات غير متوفر.");
+            if (!$this->db) throw new Exception("Database error.");
 
             $newStatus = $data['status'] ?? 'draft';
-            $paidAmt = isset($data['paid_amount']) ? (float)$data['paid_amount'] : null;
-
-            if ($paidAmt !== null) {
-                $stmt = $this->db->prepare("UPDATE project_invoices SET status = ?, paid_amount = ? WHERE id = ?");
-                $stmt->execute([$newStatus, $paidAmt, $id]);
+            
+            if (isset($data['paid_amount'])) {
+                $stmt = $this->db->prepare("UPDATE project_invoices SET status = ?, paid_amount = ? WHERE id = ? AND company_id = ?");
+                $stmt->execute([$newStatus, (float)$data['paid_amount'], $id, $companyId]);
             } else {
-                $stmt = $this->db->prepare("UPDATE project_invoices SET status = ? WHERE id = ?");
-                $stmt->execute([$newStatus, $id]);
+                $stmt = $this->db->prepare("UPDATE project_invoices SET status = ? WHERE id = ? AND company_id = ?");
+                $stmt->execute([$newStatus, $id, $companyId]);
             }
 
-            $_SESSION['flash_msg'] = "تم تحديث حالة المستخلص بنجاح.";
+            $_SESSION['flash_msg'] = $isAr ? "تم تحديث حالة المستخلص." : "Status updated.";
         } catch (Throwable $e) {
             $_SESSION['flash_err'] = $e->getMessage();
         }
@@ -353,14 +382,15 @@ class ProjectInvoiceController extends Controller
     {
         $id = $this->resolveId($id);
         if (session_status() === PHP_SESSION_NONE) session_start();
+        $companyId = $_SESSION['company_id'] ?? 1;
 
         try {
             if ($this->db) {
-                $this->db->prepare("DELETE FROM project_invoices WHERE id = ?")->execute([$id]);
-                $_SESSION['flash_msg'] = "تم حذف المستخلص/الفاتورة بنجاح.";
+                $this->db->prepare("DELETE FROM project_invoices WHERE id = ? AND company_id = ?")->execute([$id, $companyId]);
+                $_SESSION['flash_msg'] = "تم حذف المستخلص بنجاح.";
             }
         } catch (Throwable $e) {
-            $_SESSION['flash_err'] = $e->getMessage();
+            $_SESSION['flash_err'] = "خطأ أثناء الحذف.";
         }
 
         return new RedirectResponse('/ERP/projects/invoices');
@@ -369,25 +399,33 @@ class ProjectInvoiceController extends Controller
     public function show(Request $request, Response $response, $id = null): Response
     {
         $id = $this->resolveId($id);
+        if (session_status() === PHP_SESSION_NONE) session_start();
+        $companyId = $_SESSION['company_id'] ?? 1;
+        
         $invoice = null;
-
         if ($this->db) {
             $stmt = $this->db->prepare("
-                SELECT i.*, p.name_ar as project_name, p.code as project_code, p.contract_value, c.name_ar as customer_name
+                SELECT i.*, COALESCE(p.name_ar, p.name_en) as project_name, p.code as project_code, p.contract_value, c.name_ar as customer_name
                 FROM project_invoices i
                 LEFT JOIN projects p ON i.project_id = p.id
                 LEFT JOIN customers c ON i.customer_id = c.id
-                WHERE i.id = ?
+                WHERE i.id = ? AND i.company_id = ?
             ");
-            $stmt->execute([$id]);
+            $stmt->execute([$id, $companyId]);
             $invoice = $stmt->fetch(PDO::FETCH_OBJ);
         }
 
         if (!$invoice) {
-            if (session_status() === PHP_SESSION_NONE) session_start();
             $_SESSION['flash_err'] = "سجل المستخلص غير موجود.";
             return new RedirectResponse('/ERP/projects/invoices');
         }
+
+        // تحويل العملات للعرض
+        $invoice->total_amount = convert_amount($invoice->total_amount);
+        $invoice->deductions_amount = convert_amount($invoice->deductions_amount);
+        $invoice->tax_amount = convert_amount($invoice->tax_amount);
+        $invoice->net_amount = convert_amount($invoice->net_amount);
+        $invoice->paid_amount = convert_amount($invoice->paid_amount);
 
         return $this->renderView('/resources/views/projects/invoices/show.php', [
             'invoice' => $invoice
@@ -400,9 +438,8 @@ class ProjectInvoiceController extends Controller
         $fullPath = $this->basePath . $viewPath;
 
         if (!file_exists($fullPath)) {
-            die("<div style='padding:30px; background:#fff; color:#dc2626; font-family:monospace; direction:ltr;'><h3>View File Missing:</h3>" . htmlspecialchars($fullPath) . "</div>");
+            die("<div style='padding:30px; background:#fff; color:#dc2626;'>View Missing: " . htmlspecialchars($fullPath) . "</div>");
         }
-
         try {
             ob_start();
             include $fullPath;
@@ -413,12 +450,7 @@ class ProjectInvoiceController extends Controller
             return $response->setContent(ob_get_clean())->setHeader('Content-Type', 'text/html; charset=UTF-8');
         } catch (Throwable $e) {
             ob_end_clean();
-            die("<div style='padding:30px; background:#fff; color:#dc2626; font-family:monospace; direction:ltr;'>
-                    <h3>Project Invoices View Error:</h3>
-                    <p><b>Message:</b> " . htmlspecialchars($e->getMessage()) . "</p>
-                    <p><b>File:</b> " . htmlspecialchars($e->getFile()) . "</p>
-                    <p><b>Line:</b> " . $e->getLine() . "</p>
-                 </div>");
+            die("<div style='padding:30px; background:#fff; color:#dc2626;'>View Error: " . htmlspecialchars($e->getMessage()) . "</div>");
         }
     }
 }

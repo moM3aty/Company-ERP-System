@@ -40,19 +40,24 @@ $router->get('/login', function (Request $request, Response $response) use ($bas
     if (session_status() === PHP_SESSION_NONE) session_start();
     
     if (isset($_SESSION['user_id'])) {
-        return new RedirectResponse('/ERP/dashboard');
+        header("Location: /ERP/dashboard");
+        exit;
     }
 
+    // تنظيف البافر وإجبار السيرفر على إرسال HTML
+    while (ob_get_level()) { ob_end_clean(); }
+    header_remove('Content-Type');
+    header('Content-Type: text/html; charset=UTF-8');
+
+    // استدعاء ملفات التصميم اللي صلحناها
     ob_start(); 
     include $basePath . '/resources/views/auth/login.php'; 
     $content = ob_get_clean(); 
 
-    ob_start(); 
     include $basePath . '/resources/views/layouts/auth.php'; 
     
-    return $response->setContent(ob_get_clean())->setHeader('Content-Type', 'text/html; charset=UTF-8'); 
+    exit; 
 });
-
 $router->post('/login', function (Request $request, Response $response) {
     if (session_status() === PHP_SESSION_NONE) session_start();
     global $app;

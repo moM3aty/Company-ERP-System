@@ -3,26 +3,46 @@
 
 if (session_status() === PHP_SESSION_NONE) session_start();
 $isRtl = ($_SESSION['locale'] ?? 'ar') === 'ar';
+$currency = current_currency();
 
 $flashMsg = $_SESSION['flash_msg'] ?? null;
-unset($_SESSION['flash_msg']);
+$flashErr = $_SESSION['flash_err'] ?? null;
+unset($_SESSION['flash_msg'], $_SESSION['flash_err']);
 
 $t = [
     'ar' => [
         'title' => 'عقود واتفاقيات الموردين', 'desc' => 'إدارة العقود السنوية، اتفاقيات التوريد (Blanket Orders)، وتتبع فترات الصلاحية.',
         'add_btn' => 'إبرام عقد جديد', 'col_num' => 'رقم العقد / العنوان', 'col_sup' => 'المورد',
         'col_dates' => 'سريان العقد (من - إلى)', 'col_val' => 'قيمة العقد (تقديرية)',
-        'col_status' => 'الحالة', 'col_actions' => 'إجراءات', 'empty' => 'لا توجد عقود تطابق بحثك حالياً.'
+        'col_status' => 'الحالة', 'col_actions' => 'إجراءات', 'empty' => 'لا توجد عقود تطابق بحثك حالياً.',
+        'search_placeholder' => 'ابحث برقم العقد، العنوان، أو المورد...', 'search_btn' => 'بحث', 'clear' => 'إلغاء',
+        'stat_total' => 'إجمالي العقود المبحوثة', 'stat_active' => 'عقود سارية (Active)', 'stat_expired' => 'عقود منتهية (Expired)',
+        'status_active' => 'ساري', 'status_expired' => 'منتهي', 'status_draft' => 'مسودة', 'status_terminated' => 'مفسوخ',
+        'confirm_delete' => 'تأكيد الحذف؟'
     ],
     'en' => [
         'title' => 'Supplier Contracts', 'desc' => 'Manage blanket orders, annual agreements, and track contract validity.',
         'add_btn' => 'New Contract', 'col_num' => 'Contract No. / Title', 'col_sup' => 'Supplier',
         'col_dates' => 'Validity (From - To)', 'col_val' => 'Estimated Value',
-        'col_status' => 'Status', 'col_actions' => 'Actions', 'empty' => 'No contracts found matching your search.'
+        'col_status' => 'Status', 'col_actions' => 'Actions', 'empty' => 'No contracts found matching your search.',
+        'search_placeholder' => 'Search by contract no, title, or supplier...', 'search_btn' => 'Search', 'clear' => 'Clear',
+        'stat_total' => 'Total Searched Contracts', 'stat_active' => 'Active Contracts', 'stat_expired' => 'Expired Contracts',
+        'status_active' => 'Active', 'status_expired' => 'Expired', 'status_draft' => 'Draft', 'status_terminated' => 'Terminated',
+        'confirm_delete' => 'Confirm delete?'
     ]
 ][$isRtl ? 'ar' : 'en'];
 
-// KPIs
+function getContractBadge($status, $t) {
+    $map = [
+        'active' => ['bg' => '#ecfdf5', 'color' => '#059669', 'label' => $t['status_active']],
+        'expired' => ['bg' => '#fef2f2', 'color' => '#dc2626', 'label' => $t['status_expired']],
+        'draft' => ['bg' => '#f1f5f9', 'color' => '#64748b', 'label' => $t['status_draft']],
+        'terminated' => ['bg' => '#fffbeb', 'color' => '#d97706', 'label' => $t['status_terminated']]
+    ];
+    $s = $map[$status] ?? $map['draft'];
+    return "<span style='background:{$s['bg']}; color:{$s['color']}; padding:4px 12px; border-radius:8px; font-weight:800; font-size:0.75rem; border:1px solid currentColor;'>{$s['label']}</span>";
+}
+
 $activeCount = 0; $expiredCount = 0;
 if (!empty($contracts)) {
     foreach ($contracts as $c) {
@@ -34,7 +54,7 @@ if (!empty($contracts)) {
 
 <style>
     :root {
-        --c-primary: #7c3aed;       /* Violet / Mauve Theme */
+        --c-primary: #7c3aed;
         --c-primary-dark: #6d28d9;
         --c-primary-light: #ede9fe;
         --c-border: #cbd5e1;
@@ -60,7 +80,6 @@ if (!empty($contracts)) {
     .kpi-info h4 { margin: 0 0 4px 0; font-size: 0.8rem; color: var(--c-text-muted); font-weight: 800; text-transform: uppercase; }
     .kpi-info p { margin: 0; font-size: 1.4rem; font-weight: 900; font-family: monospace; color: var(--c-text-dark); }
 
-    /* Search Bar */
     .search-bar { background: #ffffff; border: 1px solid var(--c-border); border-radius: 12px; padding: 12px; display: flex; gap: 10px; margin-bottom: 24px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
     .search-input { flex: 1; border: 1px solid var(--c-border); border-radius: 8px; padding: 10px 16px; font-family: inherit; font-size: 0.95rem; background: #f8fafc; }
     .search-input:focus { border-color: var(--c-primary); background: #ffffff; outline: none; box-shadow: 0 0 0 3px var(--c-primary-light); }
@@ -75,16 +94,10 @@ if (!empty($contracts)) {
     
     .action-btn { width: 34px; height: 34px; border-radius: 8px; border: 1px solid #e2e8f0; background: #ffffff; color: var(--c-text-muted); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; text-decoration: none; margin: 0 2px; transition: 0.2s; }
     .action-btn:hover { background: var(--c-primary-light); border-color: #c4b5fd; color: var(--c-primary); }
-    .badge { padding: 4px 12px; border-radius: 8px; font-weight: 800; font-size: 0.75rem; text-transform: uppercase; }
-    .bg-active { background: #ecfdf5; color: #059669; border: 1px solid #a7f3d0; }
-    .bg-expired { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
-    .bg-draft { background: #f1f5f9; color: var(--c-text-muted); border: 1px solid #cbd5e1; }
-    .bg-terminated { background: #fffbeb; color: #d97706; border: 1px solid #fde68a; }
+    .action-btn.delete:hover { background: #fef2f2; border-color: #fecaca; color: #dc2626; }
 
-    /* Pagination */
     .pagination { display: flex; justify-content: center; align-items: center; gap: 8px; margin-top: 24px; }
     .page-link { width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; border: 1px solid var(--c-border); background: #ffffff; color: var(--c-text-muted); text-decoration: none; font-weight: 800; transition: 0.2s; }
-    .page-link:hover { background: #f1f5f9; color: var(--c-text-dark); border-color: #cbd5e1; }
     .page-link.active { background: var(--c-primary); color: #ffffff; border-color: var(--c-primary); }
 </style>
 
@@ -101,37 +114,37 @@ if (!empty($contracts)) {
     </div>
 
     <?php if($flashMsg): ?><div style="background: #ecfdf5; color: #059669; padding: 16px; border-radius: 12px; margin-bottom: 24px; font-weight: 700; border: 1px solid #a7f3d0;"><i class="ph-fill ph-check-circle"></i> <?= htmlspecialchars($flashMsg) ?></div><?php endif; ?>
+    <?php if($flashErr): ?><div style="background: #fef2f2; color: #dc2626; padding: 16px; border-radius: 12px; margin-bottom: 24px; font-weight: 700; border: 1px solid #fecaca;"><i class="ph-fill ph-warning-circle"></i> <?= htmlspecialchars($flashErr) ?></div><?php endif; ?>
 
     <div class="kpi-row">
         <div class="kpi-card">
             <div class="kpi-icon"><i class="ph-duotone ph-files"></i></div>
             <div class="kpi-info">
-                <h4>إجمالي العقود المبحوثة</h4>
+                <h4><?= $t['stat_total'] ?></h4>
                 <p><?= count($contracts ?? []) ?></p>
             </div>
         </div>
         <div class="kpi-card">
-            <div class="kpi-icon"><i class="ph-duotone ph-check-circle"></i></div>
+            <div class="kpi-icon" style="background:#ecfdf5; color:#059669;"><i class="ph-duotone ph-check-circle"></i></div>
             <div class="kpi-info">
-                <h4>عقود سارية (Active)</h4>
+                <h4><?= $t['stat_active'] ?></h4>
                 <p><?= $activeCount ?></p>
             </div>
         </div>
         <div class="kpi-card">
-            <div class="kpi-icon"><i class="ph-duotone ph-warning-circle"></i></div>
+            <div class="kpi-icon" style="background:#fef2f2; color:#dc2626;"><i class="ph-duotone ph-warning-circle"></i></div>
             <div class="kpi-info">
-                <h4>عقود منتهية (Expired)</h4>
+                <h4><?= $t['stat_expired'] ?></h4>
                 <p><?= $expiredCount ?></p>
             </div>
         </div>
     </div>
 
-    <!-- Search Form -->
     <form action="/ERP/purchasing/contracts" method="GET" class="search-bar">
-        <input type="text" name="search" class="search-input" placeholder="ابحث برقم العقد، العنوان، أو المورد..." value="<?= htmlspecialchars($search ?? '') ?>">
-        <button type="submit" class="btn-search"><i class="ph-bold ph-magnifying-glass"></i> بحث</button>
+        <input type="text" name="search" class="search-input" placeholder="<?= $t['search_placeholder'] ?>" value="<?= htmlspecialchars($search ?? '') ?>">
+        <button type="submit" class="btn-search"><i class="ph-bold ph-magnifying-glass"></i> <?= $t['search_btn'] ?></button>
         <?php if(!empty($search)): ?>
-            <a href="/ERP/purchasing/contracts" class="btn-clear"><i class="ph-bold ph-x"></i> إلغاء</a>
+            <a href="/ERP/purchasing/contracts" class="btn-clear"><i class="ph-bold ph-x"></i> <?= $t['clear'] ?></a>
         <?php endif; ?>
     </form>
 
@@ -143,9 +156,9 @@ if (!empty($contracts)) {
                         <th style="width: 25%;"><?= $t['col_num'] ?></th>
                         <th style="width: 20%;"><?= $t['col_sup'] ?></th>
                         <th style="width: 20%;"><?= $t['col_dates'] ?></th>
-                        <th style="width: 10%; text-align: end;"><?= $t['col_val'] ?></th>
+                        <th style="width: 15%; text-align: end;"><?= $t['col_val'] ?></th>
                         <th style="width: 10%; text-align: center;"><?= $t['col_status'] ?></th>
-                        <th style="width: 15%; text-align: center;"><?= $t['col_actions'] ?></th>
+                        <th style="width: 10%; text-align: center;"><?= $t['col_actions'] ?></th>
                     </tr>
                 </thead>
                 <tbody>
@@ -165,15 +178,15 @@ if (!empty($contracts)) {
                                 <div style="font-weight: 600; color: #dc2626; font-size: 0.8rem; margin-top:2px;"><i class="ph-bold ph-calendar-x"></i> <?= $c->end_date ?></div>
                             </td>
                             <td style="text-align: end; font-family: monospace; font-weight: 900; color: var(--c-primary); font-size: 1.05rem;">
-                                <?= $c->total_value > 0 ? number_format($c->total_value, 2) : '---' ?>
+                                <?= $c->total_value > 0 ? number_format($c->total_value, 2) . " " . $currency : '---' ?>
                             </td>
                             <td style="text-align: center;">
-                                <span class="badge bg-<?= strtolower($c->status) ?>"><?= strtoupper($c->status) ?></span>
+                                <?= getContractBadge($c->status, $t) ?>
                             </td>
                             <td style="text-align: center; white-space: nowrap;">
                                 <a href="/ERP/purchasing/contracts/<?= $c->id ?>" class="action-btn" title="عرض"><i class="ph-bold ph-eye"></i></a>
                                 <a href="/ERP/purchasing/contracts/<?= $c->id ?>/edit" class="action-btn" title="تعديل"><i class="ph-bold ph-pencil-simple"></i></a>
-                                <form action="/ERP/purchasing/contracts/<?= $c->id ?>/delete" method="POST" style="display:inline;" onsubmit="return confirm('تأكيد الحذف؟');">
+                                <form action="/ERP/purchasing/contracts/<?= $c->id ?>/delete" method="POST" style="display:inline;" onsubmit="return confirm('<?= $t['confirm_delete'] ?>');">
                                     <button type="submit" class="action-btn delete" title="حذف"><i class="ph-bold ph-trash"></i></button>
                                 </form>
                             </td>
@@ -184,7 +197,6 @@ if (!empty($contracts)) {
         </div>
     </div>
 
-    <!-- Pagination -->
     <?php if (isset($totalPages) && $totalPages > 1): ?>
         <div class="pagination">
             <?php for($i = 1; $i <= $totalPages; $i++): ?>

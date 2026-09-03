@@ -18,10 +18,7 @@ class ProjectCostController extends Controller
 
     public function __construct()
     {
-        ini_set('display_errors', 1);
-        ini_set('display_startup_errors', 1);
-        error_reporting(E_ALL);
-
+        ini_set('display_errors', 0);
         global $basePath, $app;
         $this->basePath = $basePath ?? dirname(__DIR__, 4);
         if ($app && $app->has(PDO::class)) {
@@ -42,6 +39,10 @@ class ProjectCostController extends Controller
 
     public function index(Request $request, Response $response): Response
     {
+        if (session_status() === PHP_SESSION_NONE) session_start();
+        $companyId = $_SESSION['company_id'] ?? 1;
+        $branchId  = $_SESSION['branch_id'] ?? 0;
+
         $uri = $_SERVER['REQUEST_URI'] ?? '';
         if (preg_match('#/projects/costs/(\d+)/edit#', $uri, $m)) return $this->edit($request, $response, (int)$m[1]);
         if (preg_match('#/projects/costs/(\d+)/update#', $uri, $m)) return $this->update($request, $response, (int)$m[1]);
@@ -70,10 +71,16 @@ class ProjectCostController extends Controller
 
         if ($this->db) {
             try {
-                $projects = $this->db->query("SELECT id, code, name_ar FROM projects ORDER BY id DESC")->fetchAll(PDO::FETCH_OBJ) ?: [];
+                $bCond = $branchId > 0 ? " AND (branch_id = $branchId OR branch_id IS NULL OR branch_id = 0)" : "";
+                $projects = $this->db->query("SELECT id, code, COALESCE(name_ar, name_en) as name_ar FROM projects WHERE company_id = $companyId $bCond ORDER BY id DESC")->fetchAll(PDO::FETCH_OBJ) ?: [];
 
-                $where = ["1=1"];
-                $params = [];
+                $where = ["c.company_id = ?"];
+                $params = [$companyId];
+
+                if ($branchId > 0) {
+                    $where[] = "(c.branch_id = ? OR c.branch_id IS NULL OR c.branch_id = 0)";
+                    $params[] = $branchId;
+                }
 
                 if ($search !== '') {
                     $where[] = "(c.voucher_number LIKE ? OR c.description LIKE ? OR c.reference_no LIKE ? OR p.name_ar LIKE ? OR s.name_ar LIKE ?)";
@@ -110,7 +117,7 @@ class ProjectCostController extends Controller
                 $totalPages = max(1, ceil($totalCount / $limit));
 
                 $stmt = $this->db->prepare("
-                    SELECT c.*, p.name_ar as project_name, p.code as project_code, s.name_ar as supplier_name, a.name_ar as account_name
+                    SELECT c.*, COALESCE(p.name_ar, p.name_en) as project_name, p.code as project_code, s.name_ar as supplier_name, a.name_ar as account_name
                     FROM project_costs c
                     LEFT JOIN projects p ON c.project_id = p.id
                     LEFT JOIN suppliers s ON c.supplier_id = s.id
@@ -122,17 +129,28 @@ class ProjectCostController extends Controller
                 $stmt->execute($params);
                 $costs = $stmt->fetchAll(PDO::FETCH_OBJ) ?: [];
 
-                $statsData = $this->db->query("
+                foreach ($costs as $c) {
+                    $c->amount = convert_amount($c->amount);
+                }
+
+                $statsStmt = $this->db->prepare("
                     SELECT 
                         COUNT(*) as total_vouchers,
                         COALESCE(SUM(amount), 0) as total_amount,
                         COALESCE(SUM(IF(cost_category = 'materials', amount, 0)), 0) as materials_cost,
                         COALESCE(SUM(IF(cost_category = 'labor', amount, 0)), 0) as labor_cost,
                         COALESCE(SUM(IF(cost_category IN ('equipment','subcontractor'), amount, 0)), 0) as equipment_cost
-                    FROM project_costs
-                ")->fetch(PDO::FETCH_OBJ);
+                    FROM project_costs c
+                    WHERE c.company_id = ? " . ($branchId > 0 ? " AND (c.branch_id = $branchId OR c.branch_id IS NULL OR c.branch_id = 0)" : "") . "
+                ");
+                $statsStmt->execute([$companyId]);
+                $statsData = $statsStmt->fetch(PDO::FETCH_OBJ);
                 if ($statsData) {
                     $stats = $statsData;
+                    $stats->total_amount = convert_amount($stats->total_amount);
+                    $stats->materials_cost = convert_amount($stats->materials_cost);
+                    $stats->labor_cost = convert_amount($stats->labor_cost);
+                    $stats->equipment_cost = convert_amount($stats->equipment_cost);
                 }
 
             } catch (Throwable $e) {
@@ -157,6 +175,10 @@ class ProjectCostController extends Controller
 
     public function create(Request $request, Response $response): Response
     {
+        if (session_status() === PHP_SESSION_NONE) session_start();
+        $companyId = $_SESSION['company_id'] ?? 1;
+        $branchId  = $_SESSION['branch_id'] ?? 0;
+
         $cost = null; 
         $projects = [];
         $suppliers = [];
@@ -165,11 +187,12 @@ class ProjectCostController extends Controller
 
         if ($this->db) {
             try {
-                $projects = $this->db->query("SELECT id, code, name_ar FROM projects ORDER BY id DESC")->fetchAll(PDO::FETCH_OBJ) ?: [];
-                $suppliers = $this->db->query("SELECT id, name_ar FROM suppliers ORDER BY name_ar ASC")->fetchAll(PDO::FETCH_OBJ) ?: [];
-                $accounts = $this->db->query("SELECT id, code, name_ar FROM accounts WHERE type IN ('expense','asset') ORDER BY code ASC")->fetchAll(PDO::FETCH_OBJ) ?: [];
+                $bCond = $branchId > 0 ? " AND (branch_id = $branchId OR branch_id IS NULL OR branch_id = 0)" : "";
+                $projects = $this->db->query("SELECT id, code, COALESCE(name_ar, name_en) as name_ar FROM projects WHERE company_id = $companyId $bCond ORDER BY id DESC")->fetchAll(PDO::FETCH_OBJ) ?: [];
+                $suppliers = $this->db->query("SELECT id, name_ar FROM suppliers WHERE company_id = $companyId ORDER BY name_ar ASC")->fetchAll(PDO::FETCH_OBJ) ?: [];
+                $accounts = $this->db->query("SELECT id, code, name_ar FROM accounts WHERE company_id = $companyId AND type IN ('expense','asset') ORDER BY code ASC")->fetchAll(PDO::FETCH_OBJ) ?: [];
                 
-                $nextSeq = (int)$this->db->query("SELECT COUNT(*) FROM project_costs")->fetchColumn() + 1;
+                $nextSeq = (int)$this->db->query("SELECT COUNT(*) FROM project_costs WHERE company_id = $companyId")->fetchColumn() + 1;
                 $autoCode = 'COST-PRJ-' . date('Y') . '-' . str_pad($nextSeq, 4, '0', STR_PAD_LEFT);
             } catch (Throwable $e) {}
         }
@@ -187,41 +210,59 @@ class ProjectCostController extends Controller
     {
         $data = $_POST;
         if (session_status() === PHP_SESSION_NONE) session_start();
+        $isAr = ($_SESSION['locale'] ?? 'ar') === 'ar';
+        $companyId = $_SESSION['company_id'] ?? 1;
+        $branchId  = $_SESSION['branch_id'] ?? 0;
 
         try {
-            if (!$this->db) throw new Exception("اتصال قاعدة البيانات غير متوفر.");
+            if (!$this->db) throw new Exception("Database connection unavailable.");
 
             if (empty($data['voucher_number']) || empty($data['project_id']) || empty($data['cost_date']) || empty($data['amount'])) {
-                throw new Exception("يرجى تعبئة الحقول الأساسية لمصروف الموقع.");
+                throw new Exception($isAr ? "يرجى تعبئة الحقول الأساسية למصروف الموقع." : "Please fill required fields.");
             }
 
             $projectId = (int)$data['project_id'];
             $amount = (float)$data['amount'];
 
-            $stmt = $this->db->prepare("
-                INSERT INTO project_costs 
-                (voucher_number, project_id, cost_category, cost_date, amount, supplier_id, account_id, reference_no, payment_status, description, notes, created_by)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ");
-            $stmt->execute([
-                trim($data['voucher_number']),
-                $projectId,
-                $data['cost_category'] ?? 'materials',
-                $data['cost_date'],
-                $amount,
-                !empty($data['supplier_id']) ? (int)$data['supplier_id'] : null,
-                !empty($data['account_id']) ? (int)$data['account_id'] : null,
-                trim($data['reference_no'] ?? ''),
-                $data['payment_status'] ?? 'paid',
-                trim($data['description'] ?? ''),
-                trim($data['notes'] ?? ''),
-                $_SESSION['user_id'] ?? 1
-            ]);
+            try {
+                $stmt = $this->db->prepare("
+                    INSERT INTO project_costs 
+                    (company_id, branch_id, voucher_number, project_id, cost_category, cost_date, amount, supplier_id, account_id, reference_no, payment_status, description, notes, created_by)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ");
+                $stmt->execute([
+                    $companyId, $branchId,
+                    trim($data['voucher_number']),
+                    $projectId,
+                    $data['cost_category'] ?? 'materials',
+                    $data['cost_date'],
+                    $amount,
+                    !empty($data['supplier_id']) ? (int)$data['supplier_id'] : null,
+                    !empty($data['account_id']) ? (int)$data['account_id'] : null,
+                    trim($data['reference_no'] ?? ''),
+                    $data['payment_status'] ?? 'paid',
+                    trim($data['description'] ?? ''),
+                    trim($data['notes'] ?? ''),
+                    $_SESSION['user_id'] ?? 1
+                ]);
+            } catch (\PDOException $ex) {
+                // Fallback
+                $stmt = $this->db->prepare("
+                    INSERT INTO project_costs 
+                    (voucher_number, project_id, cost_category, cost_date, amount, supplier_id, account_id, reference_no, payment_status, description, notes, created_by)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ");
+                $stmt->execute([
+                    trim($data['voucher_number']), $projectId, $data['cost_category'] ?? 'materials',
+                    $data['cost_date'], $amount, !empty($data['supplier_id']) ? (int)$data['supplier_id'] : null,
+                    !empty($data['account_id']) ? (int)$data['account_id'] : null, trim($data['reference_no'] ?? ''),
+                    $data['payment_status'] ?? 'paid', trim($data['description'] ?? ''), trim($data['notes'] ?? ''), $_SESSION['user_id'] ?? 1
+                ]);
+            }
 
-            // تحديث إجمالي التكاليف الفعلية المباشرة في جدول المشروع
             $this->recalculateProjectSpentAmount($projectId);
 
-            $_SESSION['flash_msg'] = "تم تسجيل مصروف الموقع وتحديث تكاليف المشروع بنجاح.";
+            $_SESSION['flash_msg'] = $isAr ? "تم تسجيل مصروف الموقع بنجاح." : "Site cost logged successfully.";
         } catch (Throwable $e) {
             $_SESSION['flash_err'] = $e->getMessage();
             return new RedirectResponse('/ERP/projects/costs/create');
@@ -234,6 +275,8 @@ class ProjectCostController extends Controller
     {
         $id = $this->resolveId($id);
         if (session_status() === PHP_SESSION_NONE) session_start();
+        $companyId = $_SESSION['company_id'] ?? 1;
+        $branchId  = $_SESSION['branch_id'] ?? 0;
 
         $cost = null;
         $projects = [];
@@ -242,17 +285,18 @@ class ProjectCostController extends Controller
         $autoCode = '';
 
         try {
-            if (!$this->db) throw new Exception("اتصال قاعدة البيانات غير متوفر.");
+            if (!$this->db) throw new Exception("Database connection unavailable.");
 
-            $stmt = $this->db->prepare("SELECT * FROM project_costs WHERE id = ?");
-            $stmt->execute([$id]);
+            $stmt = $this->db->prepare("SELECT * FROM project_costs WHERE id = ? AND company_id = ?");
+            $stmt->execute([$id, $companyId]);
             $cost = $stmt->fetch(PDO::FETCH_OBJ);
 
             if (!$cost) throw new Exception("سجل المصروف غير موجود.");
 
-            $projects = $this->db->query("SELECT id, code, name_ar FROM projects ORDER BY id DESC")->fetchAll(PDO::FETCH_OBJ) ?: [];
-            $suppliers = $this->db->query("SELECT id, name_ar FROM suppliers ORDER BY name_ar ASC")->fetchAll(PDO::FETCH_OBJ) ?: [];
-            $accounts = $this->db->query("SELECT id, code, name_ar FROM accounts WHERE type IN ('expense','asset') ORDER BY code ASC")->fetchAll(PDO::FETCH_OBJ) ?: [];
+            $bCond = $branchId > 0 ? " AND (branch_id = $branchId OR branch_id IS NULL OR branch_id = 0)" : "";
+            $projects = $this->db->query("SELECT id, code, COALESCE(name_ar, name_en) as name_ar FROM projects WHERE company_id = $companyId $bCond ORDER BY id DESC")->fetchAll(PDO::FETCH_OBJ) ?: [];
+            $suppliers = $this->db->query("SELECT id, name_ar FROM suppliers WHERE company_id = $companyId ORDER BY name_ar ASC")->fetchAll(PDO::FETCH_OBJ) ?: [];
+            $accounts = $this->db->query("SELECT id, code, name_ar FROM accounts WHERE company_id = $companyId AND type IN ('expense','asset') ORDER BY code ASC")->fetchAll(PDO::FETCH_OBJ) ?: [];
             $autoCode = $cost->voucher_number;
 
         } catch (Throwable $e) {
@@ -274,16 +318,18 @@ class ProjectCostController extends Controller
         $id = $this->resolveId($id);
         $data = $_POST;
         if (session_status() === PHP_SESSION_NONE) session_start();
+        $isAr = ($_SESSION['locale'] ?? 'ar') === 'ar';
+        $companyId = $_SESSION['company_id'] ?? 1;
 
         try {
-            if (!$this->db) throw new Exception("اتصال قاعدة البيانات غير متوفر.");
+            if (!$this->db) throw new Exception("Database error.");
 
             $projectId = (int)$data['project_id'];
 
             $stmt = $this->db->prepare("
                 UPDATE project_costs 
                 SET project_id = ?, cost_category = ?, cost_date = ?, amount = ?, supplier_id = ?, account_id = ?, reference_no = ?, payment_status = ?, description = ?, notes = ?
-                WHERE id = ?
+                WHERE id = ? AND company_id = ?
             ");
             $stmt->execute([
                 $projectId,
@@ -296,12 +342,12 @@ class ProjectCostController extends Controller
                 $data['payment_status'] ?? 'paid',
                 trim($data['description'] ?? ''),
                 trim($data['notes'] ?? ''),
-                $id
+                $id, $companyId
             ]);
 
             $this->recalculateProjectSpentAmount($projectId);
 
-            $_SESSION['flash_msg'] = "تم تحديث بيانات مصروف الموقع بنجاح.";
+            $_SESSION['flash_msg'] = $isAr ? "تم تحديث بيانات مصروف الموقع." : "Cost updated successfully.";
         } catch (Throwable $e) {
             $_SESSION['flash_err'] = $e->getMessage();
             return new RedirectResponse("/ERP/projects/costs/{$id}/edit");
@@ -314,14 +360,15 @@ class ProjectCostController extends Controller
     {
         $id = $this->resolveId($id);
         if (session_status() === PHP_SESSION_NONE) session_start();
+        $companyId = $_SESSION['company_id'] ?? 1;
 
         try {
             if ($this->db) {
-                $pStmt = $this->db->prepare("SELECT project_id FROM project_costs WHERE id = ?");
-                $pStmt->execute([$id]);
+                $pStmt = $this->db->prepare("SELECT project_id FROM project_costs WHERE id = ? AND company_id = ?");
+                $pStmt->execute([$id, $companyId]);
                 $projId = $pStmt->fetchColumn();
 
-                $this->db->prepare("DELETE FROM project_costs WHERE id = ?")->execute([$id]);
+                $this->db->prepare("DELETE FROM project_costs WHERE id = ? AND company_id = ?")->execute([$id, $companyId]);
                 
                 if ($projId) {
                     $this->recalculateProjectSpentAmount((int)$projId);
@@ -330,7 +377,7 @@ class ProjectCostController extends Controller
                 $_SESSION['flash_msg'] = "تم حذف مصروف الموقع بنجاح.";
             }
         } catch (Throwable $e) {
-            $_SESSION['flash_err'] = $e->getMessage();
+            $_SESSION['flash_err'] = "خطأ أثناء الحذف.";
         }
 
         return new RedirectResponse('/ERP/projects/costs');
@@ -339,26 +386,30 @@ class ProjectCostController extends Controller
     public function show(Request $request, Response $response, $id = null): Response
     {
         $id = $this->resolveId($id);
+        if (session_status() === PHP_SESSION_NONE) session_start();
+        $companyId = $_SESSION['company_id'] ?? 1;
+        
         $cost = null;
-
         if ($this->db) {
             $stmt = $this->db->prepare("
-                SELECT c.*, p.name_ar as project_name, p.code as project_code, s.name_ar as supplier_name, a.name_ar as account_name
+                SELECT c.*, COALESCE(p.name_ar, p.name_en) as project_name, p.code as project_code, s.name_ar as supplier_name, a.name_ar as account_name
                 FROM project_costs c
                 LEFT JOIN projects p ON c.project_id = p.id
                 LEFT JOIN suppliers s ON c.supplier_id = s.id
                 LEFT JOIN accounts a ON c.account_id = a.id
-                WHERE c.id = ?
+                WHERE c.id = ? AND c.company_id = ?
             ");
-            $stmt->execute([$id]);
+            $stmt->execute([$id, $companyId]);
             $cost = $stmt->fetch(PDO::FETCH_OBJ);
         }
 
         if (!$cost) {
-            if (session_status() === PHP_SESSION_NONE) session_start();
             $_SESSION['flash_err'] = "سجل مصروف الموقع غير موجود.";
             return new RedirectResponse('/ERP/projects/costs');
         }
+
+        // تطبيق تحويل العملات للعرض
+        $cost->amount = convert_amount($cost->amount);
 
         return $this->renderView('/resources/views/projects/costs/show.php', [
             'cost' => $cost
@@ -383,9 +434,8 @@ class ProjectCostController extends Controller
         $fullPath = $this->basePath . $viewPath;
 
         if (!file_exists($fullPath)) {
-            die("<div style='padding:30px; background:#fff; color:#dc2626; font-family:monospace; direction:ltr;'><h3>View File Missing:</h3>" . htmlspecialchars($fullPath) . "</div>");
+            die("<div style='padding:30px; background:#fff; color:#dc2626;'>View Missing: " . htmlspecialchars($fullPath) . "</div>");
         }
-
         try {
             ob_start();
             include $fullPath;
@@ -396,12 +446,7 @@ class ProjectCostController extends Controller
             return $response->setContent(ob_get_clean())->setHeader('Content-Type', 'text/html; charset=UTF-8');
         } catch (Throwable $e) {
             ob_end_clean();
-            die("<div style='padding:30px; background:#fff; color:#dc2626; font-family:monospace; direction:ltr;'>
-                    <h3>Project Costs View Error:</h3>
-                    <p><b>Message:</b> " . htmlspecialchars($e->getMessage()) . "</p>
-                    <p><b>File:</b> " . htmlspecialchars($e->getFile()) . "</p>
-                    <p><b>Line:</b> " . $e->getLine() . "</p>
-                 </div>");
+            die("<div style='padding:30px; background:#fff; color:#dc2626;'>View Error: " . htmlspecialchars($e->getMessage()) . "</div>");
         }
     }
 }

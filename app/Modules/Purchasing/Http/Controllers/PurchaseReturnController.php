@@ -18,10 +18,7 @@ class PurchaseReturnController extends Controller
 
     public function __construct()
     {
-        ini_set('display_errors', 1);
-        ini_set('display_startup_errors', 1);
-        error_reporting(E_ALL);
-
+        ini_set('display_errors', 0);
         global $basePath, $app;
         $this->basePath = $basePath ?? dirname(__DIR__, 4);
         
@@ -33,6 +30,10 @@ class PurchaseReturnController extends Controller
 
     public function index(Request $request, Response $response): Response
     {
+        if (session_status() === PHP_SESSION_NONE) session_start();
+        $companyId = $_SESSION['company_id'] ?? 1;
+        $branchId  = $_SESSION['branch_id'] ?? 0;
+
         $dbError = null;
         $search = trim($_GET['search'] ?? '');
         $page = max(1, (int)($_GET['page'] ?? 1));
@@ -40,12 +41,18 @@ class PurchaseReturnController extends Controller
         $offset = ($page - 1) * $limit;
 
         try {
-            $whereClause = "";
-            $params = [];
+            $whereClause = "WHERE prt.company_id = ?";
+            $params = [$companyId];
+
+            if ($branchId > 0) {
+                $whereClause .= " AND (prt.branch_id = ? OR prt.branch_id IS NULL OR prt.branch_id = 0)";
+                $params[] = $branchId;
+            }
+
             if ($search !== '') {
-                $whereClause = "WHERE prt.return_number LIKE ? OR s.name_ar LIKE ? OR inv.invoice_number LIKE ? OR prt.reason LIKE ?";
+                $whereClause .= " AND (prt.return_number LIKE ? OR s.name_ar LIKE ? OR s.name_en LIKE ? OR inv.invoice_number LIKE ? OR prt.reason LIKE ?)";
                 $like = "%{$search}%";
-                $params = [$like, $like, $like, $like];
+                $params = array_merge($params, [$like, $like, $like, $like, $like]);
             }
 
             $countStmt = $this->db->prepare("
@@ -60,7 +67,7 @@ class PurchaseReturnController extends Controller
             $totalPages = max(1, ceil($totalItems / $limit));
 
             $stmt = $this->db->prepare("
-                SELECT prt.*, s.name_ar as supplier_name, inv.invoice_number,
+                SELECT prt.*, COALESCE(s.name_ar, s.name_en) as supplier_name, inv.invoice_number,
                        (SELECT COUNT(id) FROM purchase_return_items WHERE return_id = prt.id) as items_count
                 FROM purchase_returns prt
                 LEFT JOIN suppliers s ON prt.supplier_id = s.id
@@ -70,6 +77,11 @@ class PurchaseReturnController extends Controller
             ");
             $stmt->execute($params);
             $returns = $stmt->fetchAll(PDO::FETCH_OBJ) ?: [];
+
+            // تحويل قيم المرتجعات بحسب العملة الحالية
+            foreach ($returns as $ret) {
+                $ret->total_amount = convert_amount($ret->total_amount);
+            }
 
         } catch (Throwable $e) {
             $returns = [];
@@ -81,9 +93,7 @@ class PurchaseReturnController extends Controller
 
         ob_start();
         $viewPath = $this->basePath . '/resources/views/purchasing/returns/index.php';
-        if ($dbError) echo "<div style='margin:20px; padding:20px; background:#fef2f2; color:#b91c1c; border-radius:8px;'><strong>DB Error:</strong> $dbError</div>";
         if (file_exists($viewPath)) include $viewPath;
-        else echo "<div style='margin:20px; padding:20px; background:#fee2e2; color:#dc2626;'>ملف الواجهة مفقود: $viewPath</div>";
         
         $content = ob_get_clean();
         ob_start(); include $this->basePath . '/resources/views/layouts/app.php';
@@ -92,17 +102,19 @@ class PurchaseReturnController extends Controller
 
     public function create(Request $request, Response $response): Response
     {
+        if (session_status() === PHP_SESSION_NONE) session_start();
+        $companyId = $_SESSION['company_id'] ?? 1;
+        $branchId  = $_SESSION['branch_id'] ?? 0;
+        $bCond     = $branchId > 0 ? " AND (branch_id = $branchId OR branch_id IS NULL OR branch_id = 0)" : "";
+
         $returnOrder = null; $items = []; $suppliers = []; $products = []; $invoices = [];
         try {
-            $suppliers = $this->db->query("SELECT id, name_ar, name_en, code FROM suppliers WHERE is_active = 1 ORDER BY id DESC")->fetchAll(PDO::FETCH_OBJ);
-            $products = $this->db->query("SELECT id, item_code as code, COALESCE(name_ar, name_en) as name FROM products ORDER BY id DESC")->fetchAll(PDO::FETCH_OBJ);
-            $invoices = $this->db->query("SELECT id, invoice_number FROM purchase_invoices ORDER BY id DESC")->fetchAll(PDO::FETCH_OBJ);
+            $suppliers = $this->db->query("SELECT id, COALESCE(name_ar, name_en) as name_ar, name_en, code FROM suppliers WHERE company_id = $companyId AND is_active = 1 $bCond ORDER BY id DESC")->fetchAll(PDO::FETCH_OBJ);
+            $products  = $this->db->query("SELECT id, item_code as code, COALESCE(name_ar, name_en) as name FROM products WHERE company_id = $companyId ORDER BY id DESC")->fetchAll(PDO::FETCH_OBJ);
+            $invoices  = $this->db->query("SELECT id, invoice_number FROM purchase_invoices WHERE company_id = $companyId $bCond ORDER BY id DESC")->fetchAll(PDO::FETCH_OBJ);
         } catch (Throwable $e) {}
 
-        ob_start(); 
-        $viewPath = $this->basePath . '/resources/views/purchasing/returns/create.php';
-        if (file_exists($viewPath)) include $viewPath;
-        $content = ob_get_clean();
+        ob_start(); include $this->basePath . '/resources/views/purchasing/returns/create.php'; $content = ob_get_clean();
         ob_start(); include $this->basePath . '/resources/views/layouts/app.php';
         return $response->setContent(ob_get_clean())->setHeader('Content-Type', 'text/html');
     }
@@ -112,6 +124,8 @@ class PurchaseReturnController extends Controller
         $data = $_POST;
         if (session_status() === PHP_SESSION_NONE) session_start();
         $isAr = ($_SESSION['locale'] ?? 'ar') === 'ar';
+        $companyId = $_SESSION['company_id'] ?? 1;
+        $branchId  = $_SESSION['branch_id'] ?? 0;
 
         try {
             if (empty($data['supplier_id'])) {
@@ -120,14 +134,13 @@ class PurchaseReturnController extends Controller
 
             $this->db->beginTransaction();
 
-            $companyId = $_SESSION['company_id'] ?? 1;
             $retNum = !empty($data['return_number']) ? trim($data['return_number']) : 'PRT-' . date('ymd') . '-' . rand(100, 999);
-            $invId = !empty($data['invoice_id']) ? $data['invoice_id'] : null;
+            $invId  = !empty($data['invoice_id']) ? $data['invoice_id'] : null;
 
             $subtotal = 0;
             if (!empty($data['description']) && is_array($data['description'])) {
                 foreach ($data['description'] as $idx => $desc) {
-                    $qty = (float)($data['quantity'][$idx] ?? 1);
+                    $qty   = (float)($data['quantity'][$idx] ?? 1);
                     $price = (float)($data['unit_price'][$idx] ?? 0);
                     $subtotal += ($qty * $price);
                 }
@@ -135,15 +148,28 @@ class PurchaseReturnController extends Controller
             $tax = (float)($data['tax_amount'] ?? 0);
             $totalAmount = $subtotal + $tax;
 
-            $stmt = $this->db->prepare("
-                INSERT INTO purchase_returns (company_id, supplier_id, invoice_id, return_number, return_date, reason, status, subtotal, tax_amount, total_amount, notes)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ");
-            $stmt->execute([
-                $companyId, $data['supplier_id'], $invId, $retNum,
-                $data['return_date'], $data['reason'] ?? null, $data['status'] ?? 'completed',
-                $subtotal, $tax, $totalAmount, $data['notes'] ?? null
-            ]);
+            try {
+                $stmt = $this->db->prepare("
+                    INSERT INTO purchase_returns (company_id, branch_id, supplier_id, invoice_id, return_number, return_date, reason, status, subtotal, tax_amount, total_amount, notes)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ");
+                $stmt->execute([
+                    $companyId, $branchId, $data['supplier_id'], $invId, $retNum,
+                    $data['return_date'], $data['reason'] ?? null, $data['status'] ?? 'completed',
+                    $subtotal, $tax, $totalAmount, $data['notes'] ?? null
+                ]);
+            } catch (\PDOException $ex) {
+                // احتياطي في حال عدم وجود عمود branch_id
+                $stmt = $this->db->prepare("
+                    INSERT INTO purchase_returns (company_id, supplier_id, invoice_id, return_number, return_date, reason, status, subtotal, tax_amount, total_amount, notes)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ");
+                $stmt->execute([
+                    $companyId, $data['supplier_id'], $invId, $retNum,
+                    $data['return_date'], $data['reason'] ?? null, $data['status'] ?? 'completed',
+                    $subtotal, $tax, $totalAmount, $data['notes'] ?? null
+                ]);
+            }
             $returnId = $this->db->lastInsertId();
 
             if (!empty($data['description']) && is_array($data['description'])) {
@@ -151,7 +177,7 @@ class PurchaseReturnController extends Controller
                 foreach ($data['description'] as $idx => $desc) {
                     if (empty($desc)) continue;
                     $prodId = !empty($data['product_id'][$idx]) ? $data['product_id'][$idx] : null;
-                    $qty = (float)($data['quantity'][$idx] ?? 1);
+                    $qty   = (float)($data['quantity'][$idx] ?? 1);
                     $price = (float)($data['unit_price'][$idx] ?? 0);
                     $stmtItem->execute([$returnId, $prodId, $desc, $qty, $price, ($qty * $price)]);
                 }
@@ -170,9 +196,14 @@ class PurchaseReturnController extends Controller
 
     public function edit(Request $request, Response $response, $id = null): Response
     {
+        if (session_status() === PHP_SESSION_NONE) session_start();
+        $companyId = $_SESSION['company_id'] ?? 1;
+        $branchId  = $_SESSION['branch_id'] ?? 0;
+        $bCond     = $branchId > 0 ? " AND (branch_id = $branchId OR branch_id IS NULL OR branch_id = 0)" : "";
+
         try {
-            $stmt = $this->db->prepare("SELECT * FROM purchase_returns WHERE id = ?");
-            $stmt->execute([$id]);
+            $stmt = $this->db->prepare("SELECT * FROM purchase_returns WHERE id = ? AND company_id = ?");
+            $stmt->execute([$id, $companyId]);
             $returnOrder = $stmt->fetch(PDO::FETCH_OBJ);
             if (!$returnOrder) throw new Exception("مرتجع المشتريات غير موجود.");
 
@@ -180,20 +211,16 @@ class PurchaseReturnController extends Controller
             $stmtItems->execute([$id]);
             $items = $stmtItems->fetchAll(PDO::FETCH_OBJ);
 
-            $suppliers = $this->db->query("SELECT id, name_ar, name_en, code FROM suppliers WHERE is_active = 1")->fetchAll(PDO::FETCH_OBJ);
-            $products = $this->db->query("SELECT id, item_code as code, COALESCE(name_ar, name_en) as name FROM products")->fetchAll(PDO::FETCH_OBJ);
-            $invoices = $this->db->query("SELECT id, invoice_number FROM purchase_invoices")->fetchAll(PDO::FETCH_OBJ);
+            $suppliers = $this->db->query("SELECT id, COALESCE(name_ar, name_en) as name_ar, name_en, code FROM suppliers WHERE company_id = $companyId AND is_active = 1 $bCond")->fetchAll(PDO::FETCH_OBJ);
+            $products  = $this->db->query("SELECT id, item_code as code, COALESCE(name_ar, name_en) as name FROM products WHERE company_id = $companyId")->fetchAll(PDO::FETCH_OBJ);
+            $invoices  = $this->db->query("SELECT id, invoice_number FROM purchase_invoices WHERE company_id = $companyId $bCond")->fetchAll(PDO::FETCH_OBJ);
 
         } catch (Throwable $e) {
-            if (session_status() === PHP_SESSION_NONE) session_start();
             $_SESSION['flash_err'] = $e->getMessage();
             return new RedirectResponse('/ERP/purchasing/returns');
         }
 
-        ob_start(); 
-        $viewPath = $this->basePath . '/resources/views/purchasing/returns/create.php';
-        if (file_exists($viewPath)) include $viewPath;
-        $content = ob_get_clean();
+        ob_start(); include $this->basePath . '/resources/views/purchasing/returns/create.php'; $content = ob_get_clean();
         ob_start(); include $this->basePath . '/resources/views/layouts/app.php';
         return $response->setContent(ob_get_clean())->setHeader('Content-Type', 'text/html');
     }
@@ -203,6 +230,7 @@ class PurchaseReturnController extends Controller
         $data = $_POST;
         if (session_status() === PHP_SESSION_NONE) session_start();
         $isAr = ($_SESSION['locale'] ?? 'ar') === 'ar';
+        $companyId = $_SESSION['company_id'] ?? 1;
 
         try {
             $this->db->beginTransaction();
@@ -212,7 +240,7 @@ class PurchaseReturnController extends Controller
             $subtotal = 0;
             if (!empty($data['description']) && is_array($data['description'])) {
                 foreach ($data['description'] as $idx => $desc) {
-                    $qty = (float)($data['quantity'][$idx] ?? 1);
+                    $qty   = (float)($data['quantity'][$idx] ?? 1);
                     $price = (float)($data['unit_price'][$idx] ?? 0);
                     $subtotal += ($qty * $price);
                 }
@@ -223,12 +251,12 @@ class PurchaseReturnController extends Controller
             $stmt = $this->db->prepare("
                 UPDATE purchase_returns 
                 SET supplier_id=?, invoice_id=?, return_date=?, reason=?, status=?, subtotal=?, tax_amount=?, total_amount=?, notes=?
-                WHERE id=?
+                WHERE id=? AND company_id=?
             ");
             $stmt->execute([
                 $data['supplier_id'], $invId, $data['return_date'],
                 $data['reason'] ?? null, $data['status'] ?? 'completed',
-                $subtotal, $tax, $totalAmount, $data['notes'] ?? null, $id
+                $subtotal, $tax, $totalAmount, $data['notes'] ?? null, $id, $companyId
             ]);
 
             $this->db->prepare("DELETE FROM purchase_return_items WHERE return_id = ?")->execute([$id]);
@@ -238,7 +266,7 @@ class PurchaseReturnController extends Controller
                 foreach ($data['description'] as $idx => $desc) {
                     if (empty($desc)) continue;
                     $prodId = !empty($data['product_id'][$idx]) ? $data['product_id'][$idx] : null;
-                    $qty = (float)($data['quantity'][$idx] ?? 1);
+                    $qty   = (float)($data['quantity'][$idx] ?? 1);
                     $price = (float)($data['unit_price'][$idx] ?? 0);
                     $stmtItem->execute([$id, $prodId, $desc, $qty, $price, ($qty * $price)]);
                 }
@@ -257,15 +285,18 @@ class PurchaseReturnController extends Controller
 
     public function show(Request $request, Response $response, $id = null): Response
     {
+        if (session_status() === PHP_SESSION_NONE) session_start();
+        $companyId = $_SESSION['company_id'] ?? 1;
+
         try {
             $stmt = $this->db->prepare("
-                SELECT prt.*, s.name_ar as supplier_name, s.code as supplier_code, s.tax_number as supplier_tax, s.phone as supplier_phone, inv.invoice_number
+                SELECT prt.*, COALESCE(s.name_ar, s.name_en) as supplier_name, s.code as supplier_code, s.tax_number as supplier_tax, s.phone as supplier_phone, inv.invoice_number
                 FROM purchase_returns prt
                 LEFT JOIN suppliers s ON prt.supplier_id = s.id
                 LEFT JOIN purchase_invoices inv ON prt.invoice_id = inv.id
-                WHERE prt.id = ?
+                WHERE prt.id = ? AND prt.company_id = ?
             ");
-            $stmt->execute([$id]);
+            $stmt->execute([$id, $companyId]);
             $returnOrder = $stmt->fetch(PDO::FETCH_OBJ);
             if (!$returnOrder) throw new Exception("مرتجع المشتريات غير موجود.");
 
@@ -278,16 +309,22 @@ class PurchaseReturnController extends Controller
             $stmtItems->execute([$id]);
             $items = $stmtItems->fetchAll(PDO::FETCH_OBJ);
 
+            // تحويل المبالغ المالية
+            $returnOrder->subtotal = convert_amount($returnOrder->subtotal);
+            $returnOrder->tax_amount = convert_amount($returnOrder->tax_amount);
+            $returnOrder->total_amount = convert_amount($returnOrder->total_amount);
+
+            foreach ($items as $item) {
+                $item->unit_price = convert_amount($item->unit_price);
+                $item->total_price = convert_amount($item->total_price);
+            }
+
         } catch (Throwable $e) {
-            if (session_status() === PHP_SESSION_NONE) session_start();
             $_SESSION['flash_err'] = $e->getMessage();
             return new RedirectResponse('/ERP/purchasing/returns');
         }
 
-        ob_start(); 
-        $viewPath = $this->basePath . '/resources/views/purchasing/returns/show.php';
-        if (file_exists($viewPath)) include $viewPath;
-        $content = ob_get_clean();
+        ob_start(); include $this->basePath . '/resources/views/purchasing/returns/show.php'; $content = ob_get_clean();
         ob_start(); include $this->basePath . '/resources/views/layouts/app.php';
         return $response->setContent(ob_get_clean())->setHeader('Content-Type', 'text/html');
     }
@@ -295,8 +332,10 @@ class PurchaseReturnController extends Controller
     public function delete(Request $request, Response $response, $id = null): Response
     {
         if (session_status() === PHP_SESSION_NONE) session_start();
+        $companyId = $_SESSION['company_id'] ?? 1;
+
         try {
-            $this->db->prepare("DELETE FROM purchase_returns WHERE id = ?")->execute([$id]);
+            $this->db->prepare("DELETE FROM purchase_returns WHERE id = ? AND company_id = ?")->execute([$id, $companyId]);
             $_SESSION['flash_msg'] = "تم حذف مرتجع المشتريات بنجاح.";
         } catch (Throwable $e) {
             $_SESSION['flash_err'] = "خطأ أثناء عملية الحذف.";

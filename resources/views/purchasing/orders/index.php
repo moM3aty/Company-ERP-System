@@ -3,6 +3,7 @@
 
 if (session_status() === PHP_SESSION_NONE) session_start();
 $isRtl = ($_SESSION['locale'] ?? 'ar') === 'ar';
+$currency = current_currency();
 
 $flashMsg = $_SESSION['flash_msg'] ?? null;
 $flashErr = $_SESSION['flash_err'] ?? null;
@@ -13,17 +14,33 @@ $t = [
         'title' => 'أوامر الشراء (PO)', 'desc' => 'إدارة أوامر الشراء الرسمية الموجهة للموردين ومتابعة التوريد.',
         'add_btn' => 'أمر شراء جديد', 'col_num' => 'رقم الأمر', 'col_sup' => 'المورد',
         'col_dates' => 'تاريخ الطلب / التسليم', 'col_val' => 'إجمالي القيمة',
-        'col_status' => 'الحالة', 'col_actions' => 'إجراءات', 'empty' => 'لا توجد أوامر شراء تطابق بحثك.'
+        'col_status' => 'الحالة', 'col_actions' => 'إجراءات', 'empty' => 'لا توجد أوامر شراء تطابق بحثك.',
+        'search_placeholder' => 'ابحث برقم الـ PO أو اسم المورد...', 'search_btn' => 'بحث', 'clear' => 'إلغاء',
+        'stat_total' => 'إجمالي الأوامر المبحوثة', 'stat_sent' => 'قيد التوريد (Sent)', 'stat_completed' => 'مكتمل (تم الاستلام)',
+        'items_count' => 'عدد الأصناف:', 'order_date' => 'أمر:', 'delivery_date' => 'تسليم:',
+        'status_draft' => 'مسودة', 'status_sent' => 'مُرسل للمورد', 'status_partially_received' => 'مستلم جزئياً', 'status_completed' => 'مكتمل (تم الاستلام)', 'status_cancelled' => 'ملغي',
+        'confirm_delete' => 'تأكيد الحذف؟'
+    ],
+    'en' => [
+        'title' => 'Purchase Orders (PO)', 'desc' => 'Manage official purchase orders sent to vendors and track delivery.',
+        'add_btn' => 'New PO', 'col_num' => 'PO Number', 'col_sup' => 'Supplier',
+        'col_dates' => 'Order / Delivery Date', 'col_val' => 'Total Value',
+        'col_status' => 'Status', 'col_actions' => 'Actions', 'empty' => 'No purchase orders match your search.',
+        'search_placeholder' => 'Search by PO number or supplier name...', 'search_btn' => 'Search', 'clear' => 'Clear',
+        'stat_total' => 'Total Searched POs', 'stat_sent' => 'In Delivery (Sent)', 'stat_completed' => 'Completed (Received)',
+        'items_count' => 'Items Count:', 'order_date' => 'Ordered:', 'delivery_date' => 'Delivery:',
+        'status_draft' => 'Draft', 'status_sent' => 'Sent to Vendor', 'status_partially_received' => 'Partially Received', 'status_completed' => 'Completed', 'status_cancelled' => 'Cancelled',
+        'confirm_delete' => 'Confirm delete?'
     ]
-][$isRtl ? 'ar' : 'ar'];
+][$isRtl ? 'ar' : 'en'];
 
-function getPoBadge($status) {
+function getPoBadge($status, $t) {
     $map = [
-        'draft' => ['bg' => '#f1f5f9', 'color' => '#475569', 'label' => 'مسودة'],
-        'sent' => ['bg' => '#eff6ff', 'color' => '#2563eb', 'label' => 'مُرسل للمورد'],
-        'partially_received' => ['bg' => '#fef3c7', 'color' => '#ea580c', 'label' => 'مستلم جزئياً'],
-        'completed' => ['bg' => '#ecfdf5', 'color' => '#059669', 'label' => 'مكتمل (تم الاستلام)'],
-        'cancelled' => ['bg' => '#fef2f2', 'color' => '#dc2626', 'label' => 'ملغي']
+        'draft' => ['bg' => '#f1f5f9', 'color' => '#475569', 'label' => $t['status_draft']],
+        'sent' => ['bg' => '#eff6ff', 'color' => '#2563eb', 'label' => $t['status_sent']],
+        'partially_received' => ['bg' => '#fef3c7', 'color' => '#ea580c', 'label' => $t['status_partially_received']],
+        'completed' => ['bg' => '#ecfdf5', 'color' => '#059669', 'label' => $t['status_completed']],
+        'cancelled' => ['bg' => '#fef2f2', 'color' => '#dc2626', 'label' => $t['status_cancelled']]
     ];
     $s = $map[$status] ?? $map['draft'];
     return "<span style='background:{$s['bg']}; color:{$s['color']}; padding:4px 12px; border-radius:8px; font-weight:800; font-size:0.75rem; border:1px solid currentColor;'>{$s['label']}</span>";
@@ -64,6 +81,12 @@ if (!empty($orders)) {
     .kpi-info h4 { margin: 0 0 4px 0; font-size: 0.8rem; color: var(--c-text-muted); font-weight: 800; text-transform: uppercase; }
     .kpi-info p { margin: 0; font-size: 1.4rem; font-weight: 900; font-family: monospace; color: var(--c-text-dark); }
 
+    .search-bar { background: #ffffff; border: 1px solid var(--c-border); border-radius: 12px; padding: 12px; display: flex; gap: 10px; margin-bottom: 24px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
+    .search-input { flex: 1; border: 1px solid var(--c-border); border-radius: 8px; padding: 10px 16px; font-family: inherit; font-size: 0.95rem; background: #f8fafc; }
+    .search-input:focus { border-color: var(--c-blue); background: #ffffff; outline: none; box-shadow: 0 0 0 3px var(--c-blue-light); }
+    .btn-search { background: var(--c-text-dark); color: #ffffff; border: none; padding: 10px 24px; border-radius: 8px; font-weight: 800; cursor: pointer; }
+    .btn-clear { background: #f1f5f9; color: var(--c-text-muted); border: 1px solid var(--c-border); padding: 10px 20px; border-radius: 8px; font-weight: 800; text-decoration: none; display: flex; align-items: center; }
+
     .table-card { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02); }
     .mod-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; text-align: start; }
     .mod-table th { padding: 16px 24px; background: #f8fafc; color: var(--c-text-muted); font-weight: 800; text-transform: uppercase; border-bottom: 2px solid #e2e8f0; font-size: 0.75rem; }
@@ -73,6 +96,10 @@ if (!empty($orders)) {
     .action-btn { width: 34px; height: 34px; border-radius: 8px; border: 1px solid #e2e8f0; background: #ffffff; color: var(--c-text-muted); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; text-decoration: none; margin: 0 2px; transition: 0.2s; }
     .action-btn:hover { background: var(--c-blue-light); border-color: #bfdbfe; color: var(--c-blue); }
     .action-btn.delete:hover { background: #fef2f2; border-color: #fecaca; color: #dc2626; }
+
+    .pagination { display: flex; justify-content: center; align-items: center; gap: 8px; margin-top: 24px; }
+    .page-link { width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; border: 1px solid var(--c-border); background: #ffffff; color: var(--c-text-muted); text-decoration: none; font-weight: 800; transition: 0.2s; }
+    .page-link.active { background: var(--c-blue); color: #ffffff; border-color: var(--c-blue); }
 </style>
 
 <div class="mod-wrapper" dir="<?= $isRtl ? 'rtl' : 'ltr' ?>">
@@ -93,78 +120,77 @@ if (!empty($orders)) {
     <div class="kpi-row">
         <div class="kpi-card">
             <div class="kpi-icon"><i class="ph-duotone ph-files"></i></div>
-            <div class="kpi-info"><h4>إجمالي الأوامر المبحوثة</h4><p><?= count($orders ?? []) ?></p></div>
+            <div class="kpi-info"><h4><?= $t['stat_total'] ?></h4><p><?= count($orders ?? []) ?></p></div>
         </div>
         <div class="kpi-card" style="border-bottom: 3px solid var(--c-blue);">
             <div class="kpi-icon" style="background:var(--c-blue-light); color:var(--c-blue);"><i class="ph-duotone ph-truck"></i></div>
-            <div class="kpi-info"><h4 style="color:var(--c-blue);">قيد التوريد (Sent)</h4><p><?= $sentCount ?></p></div>
+            <div class="kpi-info"><h4 style="color:var(--c-blue);"><?= $t['stat_sent'] ?></h4><p><?= $sentCount ?></p></div>
         </div>
         <div class="kpi-card" style="border-bottom: 3px solid #059669;">
             <div class="kpi-icon" style="background:#ecfdf5; color:#059669;"><i class="ph-duotone ph-package"></i></div>
-            <div class="kpi-info"><h4 style="color:#059669;">مكتمل (تم الاستلام)</h4><p><?= $completedCount ?></p></div>
+            <div class="kpi-info"><h4 style="color:#059669;"><?= $t['stat_completed'] ?></h4><p><?= $completedCount ?></p></div>
         </div>
     </div>
 
-    <!-- Search Form -->
-    <form action="/ERP/purchasing/orders" method="GET" style="background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:12px; display:flex; gap:10px; margin-bottom:24px;">
-        <input type="text" name="search" style="flex:1; border:1px solid #cbd5e1; border-radius:8px; padding:10px 16px; font-family:inherit; background:#f8fafc;" placeholder="ابحث برقم الـ PO أو اسم المورد..." value="<?= htmlspecialchars($search ?? '') ?>">
-        <button type="submit" style="background:#0f172a; color:#fff; border:none; padding:10px 24px; border-radius:8px; font-weight:800; cursor:pointer;"><i class="ph-bold ph-magnifying-glass"></i> بحث</button>
+    <form action="/ERP/purchasing/orders" method="GET" class="search-bar">
+        <input type="text" name="search" class="search-input" placeholder="<?= $t['search_placeholder'] ?>" value="<?= htmlspecialchars($search ?? '') ?>">
+        <button type="submit" class="btn-search"><i class="ph-bold ph-magnifying-glass"></i> <?= $t['search_btn'] ?></button>
         <?php if(!empty($search)): ?>
-            <a href="/ERP/purchasing/orders" style="background:#f1f5f9; color:#475569; border:1px solid #cbd5e1; padding:10px 20px; border-radius:8px; font-weight:800; text-decoration:none;">إلغاء</a>
+            <a href="/ERP/purchasing/orders" class="btn-clear"><i class="ph-bold ph-x"></i> <?= $t['clear'] ?></a>
         <?php endif; ?>
     </form>
 
     <div class="table-card">
-        <table class="mod-table">
-            <thead>
-                <tr>
-                    <th style="width: 15%;"><?= $t['col_num'] ?></th>
-                    <th style="width: 25%;"><?= $t['col_sup'] ?></th>
-                    <th style="width: 20%;"><?= $t['col_dates'] ?></th>
-                    <th style="width: 15%; text-align: end;"><?= $t['col_val'] ?></th>
-                    <th style="width: 10%; text-align: center;"><?= $t['col_status'] ?></th>
-                    <th style="width: 15%; text-align: center;"><?= $t['col_actions'] ?></th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php if (empty($orders)): ?>
-                    <tr><td colspan="6" style="text-align: center; padding: 40px; color: #94a3b8; font-weight: 700;"><?= $t['empty'] ?></td></tr>
-                <?php else: foreach ($orders as $o): ?>
+        <div style="overflow-x: auto;">
+            <table class="mod-table">
+                <thead>
                     <tr>
-                        <td style="font-weight: 900; color: var(--c-blue); font-family: monospace; font-size: 1rem;"><i class="ph-bold ph-hash"></i> <?= htmlspecialchars($o->po_number) ?></td>
-                        <td>
-                            <div style="font-weight: 800; color: var(--c-text-dark);"><i class="ph-fill ph-buildings text-slate-400"></i> <?= htmlspecialchars($o->supplier_name ?? '---') ?></div>
-                            <div style="color: var(--c-text-muted); font-size: 0.8rem; margin-top:2px;">عدد الأصناف: <?= $o->items_count ?></div>
-                        </td>
-                        <td>
-                            <div style="font-weight: 600; color: #475569; font-size: 0.85rem;"><i class="ph-bold ph-calendar-plus"></i> أمر: <?= $o->order_date ?></div>
-                            <div style="font-weight: 600; color: #dc2626; font-size: 0.85rem; margin-top:2px;"><i class="ph-bold ph-calendar-check"></i> تسليم: <?= $o->delivery_date ?></div>
-                        </td>
-                        <td style="text-align: end; font-family: monospace; font-weight: 900; color: var(--c-text-dark); font-size: 1.05rem;">
-                            <?= number_format($o->total_amount, 2) ?>
-                        </td>
-                        <td style="text-align: center;">
-                            <?= getPoBadge($o->status) ?>
-                        </td>
-                        <td style="text-align: center; white-space: nowrap;">
-                            <a href="/ERP/purchasing/orders/<?= $o->id ?>" class="action-btn" title="معاينة وطباعة"><i class="ph-bold ph-printer"></i></a>
-                            <a href="/ERP/purchasing/orders/<?= $o->id ?>/edit" class="action-btn" title="تعديل"><i class="ph-bold ph-pencil-simple"></i></a>
-                            <form action="/ERP/purchasing/orders/<?= $o->id ?>/delete" method="POST" style="display:inline;" onsubmit="return confirm('تأكيد الحذف؟');">
-                                <button type="submit" class="action-btn delete" title="حذف"><i class="ph-bold ph-trash"></i></button>
-                            </form>
-                        </td>
+                        <th style="width: 15%;"><?= $t['col_num'] ?></th>
+                        <th style="width: 25%;"><?= $t['col_sup'] ?></th>
+                        <th style="width: 20%;"><?= $t['col_dates'] ?></th>
+                        <th style="width: 15%; text-align: end;"><?= $t['col_val'] ?></th>
+                        <th style="width: 10%; text-align: center;"><?= $t['col_status'] ?></th>
+                        <th style="width: 15%; text-align: center;"><?= $t['col_actions'] ?></th>
                     </tr>
-                <?php endforeach; endif; ?>
-            </tbody>
-        </table>
+                </thead>
+                <tbody>
+                    <?php if (empty($orders)): ?>
+                        <tr><td colspan="6" style="text-align: center; padding: 40px; color: #94a3b8; font-weight: 700;"><?= $t['empty'] ?></td></tr>
+                    <?php else: foreach ($orders as $o): ?>
+                        <tr>
+                            <td style="font-weight: 900; color: var(--c-blue); font-family: monospace; font-size: 1rem;"><i class="ph-bold ph-hash"></i> <?= htmlspecialchars($o->po_number) ?></td>
+                            <td>
+                                <div style="font-weight: 800; color: var(--c-text-dark);"><i class="ph-fill ph-buildings text-slate-400"></i> <?= htmlspecialchars($o->supplier_name ?? '---') ?></div>
+                                <div style="color: var(--c-text-muted); font-size: 0.8rem; margin-top:2px;"><?= $t['items_count'] ?> <?= $o->items_count ?></div>
+                            </td>
+                            <td>
+                                <div style="font-weight: 600; color: #475569; font-size: 0.85rem;"><i class="ph-bold ph-calendar-plus"></i> <?= $t['order_date'] ?> <?= $o->order_date ?></div>
+                                <div style="font-weight: 600; color: #dc2626; font-size: 0.85rem; margin-top:2px;"><i class="ph-bold ph-calendar-check"></i> <?= $t['delivery_date'] ?> <?= $o->delivery_date ?></div>
+                            </td>
+                            <td style="text-align: end; font-family: monospace; font-weight: 900; color: var(--c-text-dark); font-size: 1.05rem;">
+                                <?= number_format($o->total_amount, 2) ?> <?= $currency ?>
+                            </td>
+                            <td style="text-align: center;">
+                                <?= getPoBadge($o->status, $t) ?>
+                            </td>
+                            <td style="text-align: center; white-space: nowrap;">
+                                <a href="/ERP/purchasing/orders/<?= $o->id ?>" class="action-btn" title="معاينة وطباعة"><i class="ph-bold ph-printer"></i></a>
+                                <a href="/ERP/purchasing/orders/<?= $o->id ?>/edit" class="action-btn" title="تعديل"><i class="ph-bold ph-pencil-simple"></i></a>
+                                <form action="/ERP/purchasing/orders/<?= $o->id ?>/delete" method="POST" style="display:inline;" onsubmit="return confirm('<?= $t['confirm_delete'] ?>');">
+                                    <button type="submit" class="action-btn delete" title="حذف"><i class="ph-bold ph-trash"></i></button>
+                                </form>
+                            </td>
+                        </tr>
+                    <?php endforeach; endif; ?>
+                </tbody>
+            </table>
+        </div>
     </div>
 
-    <!-- Pagination -->
     <?php if (isset($totalPages) && $totalPages > 1): ?>
-        <div style="display:flex; justify-content:center; align-items:center; gap:8px; margin-top:24px;">
+        <div class="pagination">
             <?php for($i = 1; $i <= $totalPages; $i++): ?>
-                <a href="?page=<?= $i ?>&search=<?= urlencode($search ?? '') ?>" 
-                   style="width:36px; height:36px; display:inline-flex; align-items:center; justify-content:center; border-radius:8px; border:1px solid #cbd5e1; text-decoration:none; font-weight:800; <?= $i == ($currentPage ?? 1) ? 'background:var(--c-blue); color:#fff; border-color:var(--c-blue);' : 'background:#fff; color:#475569;' ?>">
+                <a href="?page=<?= $i ?>&search=<?= urlencode($search ?? '') ?>" class="page-link <?= $i == ($currentPage ?? 1) ? 'active' : '' ?>">
                     <?= $i ?>
                 </a>
             <?php endfor; ?>

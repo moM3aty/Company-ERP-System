@@ -3,8 +3,56 @@
 
 if (session_status() === PHP_SESSION_NONE) session_start();
 $isRtl = ($_SESSION['locale'] ?? 'ar') === 'ar';
+$currency = current_currency();
 $isEdit = isset($supplier) && $supplier !== null;
 $actionUrl = $isEdit ? "/ERP/purchasing/suppliers/{$supplier->id}/update" : "/ERP/purchasing/suppliers/store";
+
+$t = [
+    'ar' => [
+        'title_new' => 'إضافة مورد جديد',
+        'title_edit' => 'تحديث بيانات المورد',
+        'basic_info' => 'بيانات الشركة والمورد',
+        'name_ar' => 'اسم المورد (عربي)',
+        'name_en' => 'اسم المورد (إنجليزي)',
+        'code' => 'كود المورد (تلقائي إن تُرك فارغاً)',
+        'contact_info' => 'معلومات التواصل والضريبة',
+        'phone' => 'رقم الهاتف',
+        'email' => 'البريد الإلكتروني',
+        'tax_number' => 'الرقم الضريبي (VAT No)',
+        'address' => 'عنوان المورد',
+        'credit_status' => 'الائتمان والحالة',
+        'credit_limit' => 'الحد الائتماني المسموح',
+        'status' => 'حالة حساب المورد',
+        'status_active' => 'نشط (Active)',
+        'status_inactive' => 'موقوف (Inactive)',
+        'notes' => 'ملاحظات داخلية',
+        'cancel' => 'إلغاء وتراجع',
+        'save' => 'تسجيل المورد',
+        'update' => 'حفظ التعديلات'
+    ],
+    'en' => [
+        'title_new' => 'Add New Supplier',
+        'title_edit' => 'Edit Supplier Profile',
+        'basic_info' => 'Company & Supplier Info',
+        'name_ar' => 'Supplier Name (Arabic)',
+        'name_en' => 'Supplier Name (English)',
+        'code' => 'Supplier Code (Auto if empty)',
+        'contact_info' => 'Contact & Tax Info',
+        'phone' => 'Phone Number',
+        'email' => 'Email Address',
+        'tax_number' => 'VAT / Tax Number',
+        'address' => 'Supplier Address',
+        'credit_status' => 'Credit & Status',
+        'credit_limit' => 'Allowed Credit Limit',
+        'status' => 'Supplier Account Status',
+        'status_active' => 'Active',
+        'status_inactive' => 'Inactive',
+        'notes' => 'Internal Notes',
+        'cancel' => 'Cancel',
+        'save' => 'Save Supplier',
+        'update' => 'Update Supplier'
+    ]
+][$isRtl ? 'ar' : 'en'];
 ?>
 
 <style>
@@ -33,7 +81,7 @@ $actionUrl = $isEdit ? "/ERP/purchasing/suppliers/{$supplier->id}/update" : "/ER
     <div class="form-header">
         <a href="/ERP/purchasing/suppliers" class="back-btn"><i class="ph-bold <?= $isRtl ? 'ph-arrow-right' : 'ph-arrow-left' ?>"></i></a>
         <h2 class="form-title">
-            <?= $isEdit ? ($isRtl ? 'تحديث بيانات المورد' : 'Edit Supplier') : ($isRtl ? 'إضافة مورد جديد' : 'New Supplier') ?>
+            <?= $isEdit ? $t['title_edit'] : $t['title_new'] ?>
         </h2>
         <?php if($isEdit): ?>
             <span style="margin-inline-start: auto; color: #db2777; font-family: monospace; font-weight: 800; font-size: 1.1rem; background: #fdf2f8; padding: 4px 12px; border-radius: 8px; border: 1px solid #fbcfe8;"><?= htmlspecialchars($supplier->code) ?></span>
@@ -47,76 +95,76 @@ $actionUrl = $isEdit ? "/ERP/purchasing/suppliers/{$supplier->id}/update" : "/ER
     <form action="<?= $actionUrl ?>" method="POST">
         
         <div class="panel-card">
-            <h3 class="panel-title"><i class="ph-duotone ph-buildings text-pink-600"></i> بيانات الشركة والمورد</h3>
+            <h3 class="panel-title"><i class="ph-duotone ph-buildings text-pink-600"></i> <?= $t['basic_info'] ?></h3>
             <div class="grid-2">
                 <div>
-                    <label class="input-label">اسم المورد (عربي) <span style="color:#ef4444">*</span></label>
+                    <label class="input-label"><?= $t['name_ar'] ?> <span style="color:#ef4444">*</span></label>
                     <input type="text" name="name_ar" class="form-control" value="<?= $isEdit ? htmlspecialchars($supplier->name_ar) : '' ?>" required>
                 </div>
 
                 <div>
-                    <label class="input-label">اسم المورد (إنجليزي)</label>
+                    <label class="input-label"><?= $t['name_en'] ?></label>
                     <input type="text" name="name_en" class="form-control" value="<?= $isEdit ? htmlspecialchars($supplier->name_en ?? '') : '' ?>">
                 </div>
 
                 <div style="grid-column: span 2;">
-                    <label class="input-label">كود المورد (يولد تلقائياً إن تُرك فارغاً)</label>
+                    <label class="input-label"><?= $t['code'] ?></label>
                     <input type="text" name="code" class="form-control" value="<?= $isEdit ? htmlspecialchars($supplier->code) : '' ?>" <?= $isEdit ? 'readonly' : '' ?>>
                 </div>
             </div>
         </div>
 
         <div class="panel-card">
-            <h3 class="panel-title"><i class="ph-duotone ph-address-book text-pink-600"></i> معلومات التواصل والضريبة</h3>
+            <h3 class="panel-title"><i class="ph-duotone ph-address-book text-pink-600"></i> <?= $t['contact_info'] ?></h3>
             <div class="grid-2">
                 <div>
-                    <label class="input-label">رقم الهاتف</label>
+                    <label class="input-label"><?= $t['phone'] ?></label>
                     <input type="text" name="phone" class="form-control" value="<?= $isEdit ? htmlspecialchars($supplier->phone ?? '') : '' ?>">
                 </div>
 
                 <div>
-                    <label class="input-label">البريد الإلكتروني</label>
+                    <label class="input-label"><?= $t['email'] ?></label>
                     <input type="email" name="email" class="form-control" value="<?= $isEdit ? htmlspecialchars($supplier->email ?? '') : '' ?>">
                 </div>
                 
                 <div style="grid-column: span 2;">
-                    <label class="input-label">الرقم الضريبي (VAT No)</label>
+                    <label class="input-label"><?= $t['tax_number'] ?></label>
                     <input type="text" name="tax_number" class="form-control" style="font-family: monospace; font-weight: 800;" value="<?= $isEdit ? htmlspecialchars($supplier->tax_number ?? '') : '' ?>">
                 </div>
 
                 <div style="grid-column: span 2;">
-                    <label class="input-label">عنوان المورد</label>
+                    <label class="input-label"><?= $t['address'] ?></label>
                     <input type="text" name="address" class="form-control" value="<?= $isEdit ? htmlspecialchars($supplier->address ?? '') : '' ?>">
                 </div>
             </div>
         </div>
 
         <div class="panel-card">
-            <h3 class="panel-title"><i class="ph-duotone ph-shield-check text-pink-600"></i> الائتمان والحالة</h3>
+            <h3 class="panel-title"><i class="ph-duotone ph-shield-check text-pink-600"></i> <?= $t['credit_status'] ?></h3>
             <div class="grid-2">
                 <div>
-                    <label class="input-label">الحد الائتماني المسموح للمشتريات آجلة</label>
+                    <label class="input-label"><?= $t['credit_limit'] ?> (<?= $currency ?>)</label>
                     <input type="number" step="0.01" name="credit_limit" class="form-control" value="<?= $isEdit ? htmlspecialchars($supplier->credit_limit) : '0.00' ?>" style="font-weight:800; font-family:monospace; color:#db2777;">
                 </div>
 
                 <div>
-                    <label class="input-label">حالة حساب المورد</label>
+                    <label class="input-label"><?= $t['status'] ?></label>
                     <select name="is_active" class="form-control">
-                        <option value="1" <?= ($isEdit && $supplier->is_active == 1) ? 'selected' : '' ?>>نشط (Active)</option>
-                        <option value="0" <?= ($isEdit && $supplier->is_active == 0) ? 'selected' : '' ?>>موقوف (Inactive)</option>
+                        <option value="1" <?= ($isEdit && $supplier->is_active == 1) ? 'selected' : '' ?>><?= $t['status_active'] ?></option>
+                        <option value="0" <?= ($isEdit && $supplier->is_active == 0) ? 'selected' : '' ?>><?= $t['status_inactive'] ?></option>
                     </select>
                 </div>
 
                 <div style="grid-column: span 2;">
-                    <label class="input-label">ملاحظات داخلية</label>
+                    <label class="input-label"><?= $t['notes'] ?></label>
                     <input type="text" name="notes" class="form-control" value="<?= $isEdit ? htmlspecialchars($supplier->notes ?? '') : '' ?>">
                 </div>
             </div>
         </div>
 
         <div class="sticky-footer">
-            <a href="/ERP/purchasing/suppliers" class="btn" style="background: #ffffff; border: 1px solid #cbd5e1; color: #475569;">إلغاء</a>
-            <button type="submit" class="btn btn-submit"><i class="ph-bold ph-floppy-disk"></i> <?= $isEdit ? 'حفظ التعديلات' : 'تسجيل المورد' ?></button>
+            <a href="/ERP/purchasing/suppliers" class="btn" style="background: #ffffff; border: 1px solid #cbd5e1; color: #475569;"><?= $t['cancel'] ?></a>
+            <button type="submit" class="btn btn-submit"><i class="ph-bold ph-floppy-disk"></i> <?= $isEdit ? $t['update'] : $t['save'] ?></button>
         </div>
     </form>
 </div>

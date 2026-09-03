@@ -6,6 +6,51 @@ $isAr = ($_SESSION['locale'] ?? 'ar') === 'ar';
 $dir = $isAr ? 'rtl' : 'ltr';
 
 $supName = $isAr ? ($evaluation->supplier_name ?? 'عام') : ($evaluation->supplier_name ?? 'General Supplier');
+
+$t = [
+    'ar' => [
+        'title' => 'تقرير تقييم المورد',
+        'print' => 'طباعة التقرير A4',
+        'brand_sub' => 'تقرير تقييم أداء جودة الموردين المعتمد',
+        'supplier' => 'المورد محل التقييم',
+        'date_period' => 'تاريخ التقييم / الفترة',
+        'evaluator' => 'اسم المقيم',
+        'default_evaluator' => 'إدارة المشتريات',
+        'overall_score' => 'النسبة الإجمالية المستحقة',
+        'criteria_results' => 'تفاصيل نتائج معايير التقييم:',
+        'c1' => '1. الالتزام بالمواعيد:',
+        'c2' => '2. جودة المواصفات:',
+        'c3' => '3. تنافسية الأسعار:',
+        'c4' => '4. خدمة ما بعد التوريد:',
+        'decision' => 'التوصية النهائية والقرار:',
+        'default_recommendation' => 'استمرار التعامل وفق الشروط المعتمدة.',
+        'sig_officer' => 'مسؤول التقييم',
+        'sig_mgr' => 'مدير المشتريات',
+        'sig_qa' => 'مدير توكيد الجودة',
+        'general' => 'عام'
+    ],
+    'en' => [
+        'title' => 'Supplier Evaluation Report',
+        'print' => 'Print Report A4',
+        'brand_sub' => 'Approved Supplier Performance & Quality Audit Sheet',
+        'supplier' => 'Evaluated Supplier',
+        'date_period' => 'Date / Period',
+        'evaluator' => 'Evaluator Officer',
+        'default_evaluator' => 'Purchasing Department',
+        'overall_score' => 'Total Overall Score',
+        'criteria_results' => 'Evaluation Criteria Breakdown:',
+        'c1' => '1. Delivery Compliance:',
+        'c2' => '2. Quality & Specs:',
+        'c3' => '3. Price Competitiveness:',
+        'c4' => '4. Support & Service:',
+        'decision' => 'Final Recommendation & Decision:',
+        'default_recommendation' => 'Continue dealing under approved terms.',
+        'sig_officer' => 'Evaluator Officer',
+        'sig_mgr' => 'Purchasing Manager',
+        'sig_qa' => 'QA Manager',
+        'general' => 'General'
+    ]
+][$isAr ? 'ar' : 'en'];
 ?>
 
 <style>
@@ -35,12 +80,49 @@ $supName = $isAr ? ($evaluation->supplier_name ?? 'عام') : ($evaluation->supp
 
     .print-signatures { display: none; }
 
+    /* ========================================= */
+    /* إعدادات الطباعة الشاملة والحجب الإجباري */
+    /* ========================================= */
     @media print {
-        @page { size: A4 portrait; margin: 12mm 15mm; }
-        body { background: #fff !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-        .nt-sidebar, header, nav, footer, .top-bar { display: none !important; }
-        .eval-show-wrapper { max-width: 100% !important; margin: 0 !important; padding: 0 !important; }
-        .eval-canvas { border: none !important; box-shadow: none !important; padding: 0 !important; }
+        @page { size: A4 portrait; margin: 15mm; }
+        
+        /* 1. حجب جميع عناصر الصفحة خارج كارت التقييم */
+        body * {
+            visibility: hidden !important;
+        }
+        
+        /* 2. إظهار ورقة التقييم فقط */
+        .eval-canvas, .eval-canvas * {
+            visibility: visible !important;
+        }
+        
+        .eval-canvas {
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 100% !important;
+            border: none !important;
+            box-shadow: none !important;
+            padding: 0 !important;
+        }
+
+        /* 3. الإخفاء الجذري لكل مكونات البحث، الترقيم، و DataTables */
+        .table-pagination-nav,
+        .table-pagination-nav *,
+        .print-canvas .table-pagination-nav,
+        .dataTables_info, .dataTables_paginate, .pagination {
+            display: none !important;
+            visibility: hidden !important;
+            opacity: 0 !important;
+            height: 0 !important;
+            width: 0 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+
+        .info-grid { border: 1px solid #0f172a !important; background: transparent !important; page-break-inside: avoid !important; }
+        .grade-badge-huge { border: 1px solid #0f172a !important; background: #f8fafc !important; color: #000 !important; -webkit-print-color-adjust: exact !important; }
+
         .print-signatures { display: flex !important; justify-content: space-between !important; margin-top: 50px !important; padding-top: 15px !important; border-top: 2px dashed #0f172a !important; page-break-inside: avoid !important; }
         .sig-box { text-align: center !important; flex: 1 !important; font-weight: 800 !important; }
         .sig-line { border-top: 1px dashed #0f172a !important; width: 70% !important; margin: 35px auto 0 auto !important; }
@@ -52,9 +134,9 @@ $supName = $isAr ? ($evaluation->supplier_name ?? 'عام') : ($evaluation->supp
     <div class="top-bar">
         <div style="display: flex; align-items: center; gap: 12px;">
             <a href="/ERP/purchasing/supplier-evaluations" class="back-btn"><i class="ph-bold <?= $isAr ? 'ph-arrow-right' : 'ph-arrow-left' ?>"></i></a>
-            <h3 style="margin:0; font-size: 1.3rem; font-weight: 800; color: #0f172a;"><?= $isAr ? 'تقرير تقييم المورد' : 'Supplier Evaluation Report' ?></h3>
+            <h3 style="margin:0; font-size: 1.3rem; font-weight: 800; color: #0f172a;"><?= $t['title'] ?></h3>
         </div>
-        <button type="button" onclick="window.print()" class="btn-act btn-act-dark"><i class="ph-bold ph-printer"></i> <?= $isAr ? 'طباعة التقرير A4' : 'Print Report' ?></button>
+        <button type="button" onclick="safePrint()" class="btn-act btn-act-dark"><i class="ph-bold ph-printer"></i> <?= $t['print'] ?></button>
     </div>
 
     <div class="eval-canvas">
@@ -62,7 +144,7 @@ $supName = $isAr ? ($evaluation->supplier_name ?? 'عام') : ($evaluation->supp
         <div class="canvas-header">
             <div>
                 <h1 class="brand-title">Nour Trust ERP</h1>
-                <p class="brand-sub">تقرير تقييم أداء ومودة الموردين المعتمد</p>
+                <p class="brand-sub"><?= $t['brand_sub'] ?></p>
             </div>
             <div style="text-align: <?= $isAr ? 'left' : 'right' ?>;">
                 <span class="grade-badge-huge"><?= htmlspecialchars($evaluation->grade) ?></span>
@@ -72,64 +154,81 @@ $supName = $isAr ? ($evaluation->supplier_name ?? 'عام') : ($evaluation->supp
 
         <div class="info-grid">
             <div class="info-box">
-                <h5>المورد محل التقييم</h5>
+                <h5><?= $t['supplier'] ?></h5>
                 <p><?= htmlspecialchars($supName) ?> (<?= htmlspecialchars($evaluation->supplier_code ?? '---') ?>)</p>
             </div>
             <div class="info-box">
-                <h5>تاريخ التقييم / الفتره</h5>
-                <p><?= htmlspecialchars($evaluation->evaluation_date) ?> (<?= htmlspecialchars($evaluation->period_covered ?? 'عام') ?>)</p>
+                <h5><?= $t['date_period'] ?></h5>
+                <p><?= htmlspecialchars($evaluation->evaluation_date) ?> (<?= htmlspecialchars($evaluation->period_covered ?? $t['general']) ?>)</p>
             </div>
             <div class="info-box">
-                <h5>اسم المقيم</h5>
-                <p><?= htmlspecialchars($evaluation->evaluator_name ?? 'إدارة المشتريات') ?></p>
+                <h5><?= $t['evaluator'] ?></h5>
+                <p><?= htmlspecialchars($evaluation->evaluator_name ?? $t['default_evaluator']) ?></p>
             </div>
             <div class="info-box">
-                <h5>النسبة الإجمالية المستحقة</h5>
+                <h5><?= $t['overall_score'] ?></h5>
                 <p style="color: #059669; font-family: monospace; font-size: 1.2rem;"><?= number_format($evaluation->overall_score, 2) ?> %</p>
             </div>
         </div>
 
-        <h4 style="margin: 0 0 16px 0; color: #0f172a; font-size: 1.1rem; font-weight: 800; border-bottom: 2px solid #f1f5f9; padding-bottom: 8px;">تفاصيل نتائج معايير التقييم:</h4>
+        <h4 style="margin: 0 0 16px 0; color: #0f172a; font-size: 1.1rem; font-weight: 800; border-bottom: 2px solid #f1f5f9; padding-bottom: 8px;"><?= $t['criteria_results'] ?></h4>
 
         <div class="score-row">
-            <div><strong>1. الالتزام بالمواعيد:</strong> <span style="font-family: monospace; font-weight: 800; color: #db2777;"><?= $evaluation->delivery_score ?>%</span></div>
+            <div><strong><?= $t['c1'] ?></strong> <span style="font-family: monospace; font-weight: 800; color: #db2777;"><?= $evaluation->delivery_score ?>%</span></div>
             <div class="score-progress-bar"><div class="score-progress-fill" style="width: <?= $evaluation->delivery_score ?>%;"></div></div>
         </div>
 
         <div class="score-row">
-            <div><strong>2. جودة المواصفات:</strong> <span style="font-family: monospace; font-weight: 800; color: #db2777;"><?= $evaluation->quality_score ?>%</span></div>
+            <div><strong><?= $t['c2'] ?></strong> <span style="font-family: monospace; font-weight: 800; color: #db2777;"><?= $evaluation->quality_score ?>%</span></div>
             <div class="score-progress-bar"><div class="score-progress-fill" style="width: <?= $evaluation->quality_score ?>%;"></div></div>
         </div>
 
         <div class="score-row">
-            <div><strong>3. تنافسية الأسعار:</strong> <span style="font-family: monospace; font-weight: 800; color: #db2777;"><?= $evaluation->price_score ?>%</span></div>
+            <div><strong><?= $t['c3'] ?></strong> <span style="font-family: monospace; font-weight: 800; color: #db2777;"><?= $evaluation->price_score ?>%</span></div>
             <div class="score-progress-bar"><div class="score-progress-fill" style="width: <?= $evaluation->price_score ?>%;"></div></div>
         </div>
 
         <div class="score-row">
-            <div><strong>4. خدمة ما بعد التوريد:</strong> <span style="font-family: monospace; font-weight: 800; color: #db2777;"><?= $evaluation->service_score ?>%</span></div>
+            <div><strong><?= $t['c4'] ?></strong> <span style="font-family: monospace; font-weight: 800; color: #db2777;"><?= $evaluation->service_score ?>%</span></div>
             <div class="score-progress-bar"><div class="score-progress-fill" style="width: <?= $evaluation->service_score ?>%;"></div></div>
         </div>
 
         <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin-top: 28px;">
-            <h5 style="margin: 0 0 8px 0; color: #64748b; font-size: 0.8rem; font-weight: 800; text-transform: uppercase;">التوصية النهائية والقرار:</h5>
-            <div style="color: #0f172a; font-weight: 700; line-height: 1.6;"><?= nl2br(htmlspecialchars($evaluation->recommendation ?? 'استمرار التعامل وفق الشروط المعتمدة.')) ?></div>
+            <h5 style="margin: 0 0 8px 0; color: #64748b; font-size: 0.8rem; font-weight: 800; text-transform: uppercase;"><?= $t['decision'] ?></h5>
+            <div style="color: #0f172a; font-weight: 700; line-height: 1.6;"><?= nl2br(htmlspecialchars($evaluation->recommendation ?? $t['default_recommendation'])) ?></div>
         </div>
 
         <div class="print-signatures">
             <div class="sig-box">
-                <div>مسؤول التقييم</div>
+                <div><?= $t['sig_officer'] ?></div>
                 <div class="sig-line"></div>
             </div>
             <div class="sig-box">
-                <div>مدير المشتريات</div>
+                <div><?= $t['sig_mgr'] ?></div>
                 <div class="sig-line"></div>
             </div>
             <div class="sig-box">
-                <div>مدير توكيد الجودة</div>
+                <div><?= $t['sig_qa'] ?></div>
                 <div class="sig-line"></div>
             </div>
         </div>
 
     </div>
 </div>
+
+<script>
+function purgeControls() {
+    const selectors = ['.table-pagination-nav', '.dataTables_info', '.dataTables_paginate', '.pagination'];
+    selectors.forEach(s => {
+        document.querySelectorAll(s).forEach(el => el.remove());
+    });
+}
+
+function safePrint() {
+    purgeControls();
+    window.print();
+}
+
+document.addEventListener("DOMContentLoaded", purgeControls);
+window.addEventListener("beforeprint", purgeControls);
+</script>

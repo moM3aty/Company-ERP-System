@@ -3,6 +3,7 @@
 
 if (session_status() === PHP_SESSION_NONE) session_start();
 $isRtl = ($_SESSION['locale'] ?? 'ar') === 'ar';
+$currency = current_currency();
 
 $flashMsg = $_SESSION['flash_msg'] ?? null;
 $flashErr = $_SESSION['flash_err'] ?? null;
@@ -12,21 +13,29 @@ $t = [
     'ar' => [
         'title' => 'أذونات استلام البضائع (GRN)', 'desc' => 'إدارة محاضر استلام وفحص البضائع الموردة وتدقيق الكميات المقبولة.',
         'add_btn' => 'إذن استلام جديد', 'col_num' => 'رقم الإذن / أمر الشراء', 'col_sup' => 'المورد / بوليصة الشحن',
-        'col_date' => 'تاريخ الاستلام', 'col_status' => 'الحالة', 'col_actions' => 'إجراءات', 'empty' => 'لا توجد أذونات استلام تطابق بحثك.'
+        'col_date' => 'تاريخ الاستلام', 'col_status' => 'الحالة', 'col_actions' => 'إجراءات', 'empty' => 'لا توجد أذونات استلام تطابق بحثك.',
+        'search_placeholder' => 'ابحث برقم الإذن، رقم البوليصة، المورد أو أمر الشراء...', 'search_btn' => 'بحث', 'clear' => 'إلغاء',
+        'po_label' => 'أمر شراء:', 'dn_label' => 'إذن التسليم:', 'received_by' => 'مستلم:',
+        'status_draft' => 'مسودة', 'status_inspected' => 'قيد الفحص', 'status_accepted' => 'مقبول واستلم', 'status_rejected' => 'مرفوض',
+        'confirm_delete' => 'تأكيد الحذف؟'
     ],
     'en' => [
         'title' => 'Goods Receipts (GRN)', 'desc' => 'Manage warehouse inward gate passes and inspected items.',
         'add_btn' => 'New Goods Receipt', 'col_num' => 'GRN / PO Number', 'col_sup' => 'Supplier / Delivery Note',
-        'col_date' => 'Receipt Date', 'col_status' => 'Status', 'col_actions' => 'Actions', 'empty' => 'No goods receipts found.'
+        'col_date' => 'Receipt Date', 'col_status' => 'Status', 'col_actions' => 'Actions', 'empty' => 'No goods receipts found.',
+        'search_placeholder' => 'Search by GRN no, delivery note, supplier or PO...', 'search_btn' => 'Search', 'clear' => 'Clear',
+        'po_label' => 'PO:', 'dn_label' => 'Delivery Note:', 'received_by' => 'Received by:',
+        'status_draft' => 'Draft', 'status_inspected' => 'Inspected', 'status_accepted' => 'Accepted', 'status_rejected' => 'Rejected',
+        'confirm_delete' => 'Confirm delete?'
     ]
 ][$isRtl ? 'ar' : 'en'];
 
-function getGrnBadge($status) {
+function getGrnBadge($status, $t) {
     $map = [
-        'draft' => ['bg' => '#f1f5f9', 'color' => '#64748b', 'label' => 'مسودة'],
-        'inspected' => ['bg' => '#fef3c7', 'color' => '#d97706', 'label' => 'قيد الفحص'],
-        'accepted' => ['bg' => '#ecfdf5', 'color' => '#059669', 'label' => 'مقبول واستلم'],
-        'rejected' => ['bg' => '#fef2f2', 'color' => '#dc2626', 'label' => 'مرفوض']
+        'draft' => ['bg' => '#f1f5f9', 'color' => '#64748b', 'label' => $t['status_draft']],
+        'inspected' => ['bg' => '#fef3c7', 'color' => '#d97706', 'label' => $t['status_inspected']],
+        'accepted' => ['bg' => '#ecfdf5', 'color' => '#059669', 'label' => $t['status_accepted']],
+        'rejected' => ['bg' => '#fef2f2', 'color' => '#dc2626', 'label' => $t['status_rejected']]
     ];
     $s = $map[$status] ?? $map['accepted'];
     return "<span style='background:{$s['bg']}; color:{$s['color']}; padding:4px 12px; border-radius:8px; font-weight:800; font-size:0.75rem; border:1px solid currentColor;'>{$s['label']}</span>";
@@ -71,7 +80,6 @@ function getGrnBadge($status) {
 
     .pagination { display: flex; justify-content: center; align-items: center; gap: 8px; margin-top: 24px; }
     .page-link { width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; border: 1px solid var(--c-border); background: #ffffff; color: var(--c-text-muted); text-decoration: none; font-weight: 800; transition: 0.2s; }
-    .page-link:hover { background: #f1f5f9; color: var(--c-text-dark); }
     .page-link.active { background: var(--c-emerald); color: #ffffff; border-color: var(--c-emerald); }
 </style>
 
@@ -90,66 +98,66 @@ function getGrnBadge($status) {
     <?php if($flashMsg): ?><div style="background: #ecfdf5; color: #059669; padding: 16px; border-radius: 12px; margin-bottom: 24px; font-weight: 700; border: 1px solid #a7f3d0;"><i class="ph-fill ph-check-circle"></i> <?= htmlspecialchars($flashMsg) ?></div><?php endif; ?>
     <?php if($flashErr): ?><div style="background: #fef2f2; color: #dc2626; padding: 16px; border-radius: 12px; margin-bottom: 24px; font-weight: 700; border: 1px solid #fecaca;"><i class="ph-fill ph-warning-circle"></i> <?= htmlspecialchars($flashErr) ?></div><?php endif; ?>
 
-    <!-- Search Form -->
     <form action="/ERP/purchasing/receipts" method="GET" class="search-bar">
-        <input type="text" name="search" class="search-input" placeholder="ابحث برقم الإذن، رقم البوليصة، المورد أو أمر الشراء..." value="<?= htmlspecialchars($search ?? '') ?>">
-        <button type="submit" class="btn-search"><i class="ph-bold ph-magnifying-glass"></i> بحث</button>
+        <input type="text" name="search" class="search-input" placeholder="<?= $t['search_placeholder'] ?>" value="<?= htmlspecialchars($search ?? '') ?>">
+        <button type="submit" class="btn-search"><i class="ph-bold ph-magnifying-glass"></i> <?= $t['search_btn'] ?></button>
         <?php if(!empty($search)): ?>
-            <a href="/ERP/purchasing/receipts" class="btn-clear"><i class="ph-bold ph-x"></i> إلغاء</a>
+            <a href="/ERP/purchasing/receipts" class="btn-clear"><i class="ph-bold ph-x"></i> <?= $t['clear'] ?></a>
         <?php endif; ?>
     </form>
 
     <div class="table-card">
-        <table class="mod-table">
-            <thead>
-                <tr>
-                    <th style="width: 25%;"><?= $t['col_num'] ?></th>
-                    <th style="width: 30%;"><?= $t['col_sup'] ?></th>
-                    <th style="width: 15%;"><?= $t['col_date'] ?></th>
-                    <th style="width: 15%; text-align: center;"><?= $t['col_status'] ?></th>
-                    <th style="width: 15%; text-align: center;"><?= $t['col_actions'] ?></th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php if (empty($receipts)): ?>
-                    <tr><td colspan="5" style="text-align: center; padding: 40px; color: #94a3b8; font-weight: 700;"><?= $t['empty'] ?></td></tr>
-                <?php else: foreach ($receipts as $r): ?>
+        <div style="overflow-x: auto;">
+            <table class="mod-table">
+                <thead>
                     <tr>
-                        <td>
-                            <div style="font-weight: 900; color: var(--c-emerald); font-family: monospace; font-size: 1rem;"><i class="ph-bold ph-hash"></i> <?= htmlspecialchars($r->receipt_number) ?></div>
-                            <?php if(!empty($r->po_number)): ?>
-                                <div style="color: var(--c-text-muted); font-size: 0.8rem; margin-top:2px;">أمر شراء: <span style="font-family:monospace; font-weight:bold; color:#0f172a;"><?= htmlspecialchars($r->po_number) ?></span></div>
-                            <?php endif; ?>
-                        </td>
-                        <td>
-                            <div style="font-weight: 800; color: var(--c-text-dark);"><i class="ph-fill ph-buildings text-slate-400"></i> <?= htmlspecialchars($r->supplier_name ?? '---') ?></div>
-                            <?php if(!empty($r->delivery_note_number)): ?>
-                                <div style="color: var(--c-text-muted); font-size: 0.8rem; margin-top:2px;">إذن التسليم: <span style="font-family:monospace;"><?= htmlspecialchars($r->delivery_note_number) ?></span></div>
-                            <?php endif; ?>
-                        </td>
-                        <td>
-                            <div style="font-weight: 700; color: #334155;"><i class="ph-bold ph-calendar-blank"></i> <?= $r->receipt_date ?></div>
-                            <?php if(!empty($r->received_by)): ?>
-                                <div style="color: var(--c-text-muted); font-size: 0.8rem; margin-top:2px;"><i class="ph-fill ph-user"></i> <?= htmlspecialchars($r->received_by) ?></div>
-                            <?php endif; ?>
-                        </td>
-                        <td style="text-align: center;">
-                            <?= getGrnBadge($r->status) ?>
-                        </td>
-                        <td style="text-align: center; white-space: nowrap;">
-                            <a href="/ERP/purchasing/receipts/<?= $r->id ?>" class="action-btn" title="معاينة وطباعة"><i class="ph-bold ph-printer"></i></a>
-                            <a href="/ERP/purchasing/receipts/<?= $r->id ?>/edit" class="action-btn" title="تعديل"><i class="ph-bold ph-pencil-simple"></i></a>
-                            <form action="/ERP/purchasing/receipts/<?= $r->id ?>/delete" method="POST" style="display:inline;" onsubmit="return confirm('تأكيد الحذف؟');">
-                                <button type="submit" class="action-btn delete" title="حذف"><i class="ph-bold ph-trash"></i></button>
-                            </form>
-                        </td>
+                        <th style="width: 25%;"><?= $t['col_num'] ?></th>
+                        <th style="width: 30%;"><?= $t['col_sup'] ?></th>
+                        <th style="width: 15%;"><?= $t['col_date'] ?></th>
+                        <th style="width: 15%; text-align: center;"><?= $t['col_status'] ?></th>
+                        <th style="width: 15%; text-align: center;"><?= $t['col_actions'] ?></th>
                     </tr>
-                <?php endforeach; endif; ?>
-            </tbody>
-        </table>
+                </thead>
+                <tbody>
+                    <?php if (empty($receipts)): ?>
+                        <tr><td colspan="5" style="text-align: center; padding: 40px; color: #94a3b8; font-weight: 700;"><?= $t['empty'] ?></td></tr>
+                    <?php else: foreach ($receipts as $r): ?>
+                        <tr>
+                            <td>
+                                <div style="font-weight: 900; color: var(--c-emerald); font-family: monospace; font-size: 1rem;"><i class="ph-bold ph-hash"></i> <?= htmlspecialchars($r->receipt_number) ?></div>
+                                <?php if(!empty($r->po_number)): ?>
+                                    <div style="color: var(--c-text-muted); font-size: 0.8rem; margin-top:2px;"><?= $t['po_label'] ?> <span style="font-family:monospace; font-weight:bold; color:#0f172a;"><?= htmlspecialchars($r->po_number) ?></span></div>
+                                <?php endif; ?>
+                            </td>
+                            <td>
+                                <div style="font-weight: 800; color: var(--c-text-dark);"><i class="ph-fill ph-buildings text-slate-400"></i> <?= htmlspecialchars($r->supplier_name ?? '---') ?></div>
+                                <?php if(!empty($r->delivery_note_number)): ?>
+                                    <div style="color: var(--c-text-muted); font-size: 0.8rem; margin-top:2px;"><?= $t['dn_label'] ?> <span style="font-family:monospace;"><?= htmlspecialchars($r->delivery_note_number) ?></span></div>
+                                <?php endif; ?>
+                            </td>
+                            <td>
+                                <div style="font-weight: 700; color: #334155;"><i class="ph-bold ph-calendar-blank"></i> <?= $r->receipt_date ?></div>
+                                <?php if(!empty($r->received_by)): ?>
+                                    <div style="color: var(--c-text-muted); font-size: 0.8rem; margin-top:2px;"><i class="ph-fill ph-user"></i> <?= htmlspecialchars($r->received_by) ?></div>
+                                <?php endif; ?>
+                            </td>
+                            <td style="text-align: center;">
+                                <?= getGrnBadge($r->status, $t) ?>
+                            </td>
+                            <td style="text-align: center; white-space: nowrap;">
+                                <a href="/ERP/purchasing/receipts/<?= $r->id ?>" class="action-btn" title="معاينة وطباعة"><i class="ph-bold ph-printer"></i></a>
+                                <a href="/ERP/purchasing/receipts/<?= $r->id ?>/edit" class="action-btn" title="تعديل"><i class="ph-bold ph-pencil-simple"></i></a>
+                                <form action="/ERP/purchasing/receipts/<?= $r->id ?>/delete" method="POST" style="display:inline;" onsubmit="return confirm('<?= $t['confirm_delete'] ?>');">
+                                    <button type="submit" class="action-btn delete" title="حذف"><i class="ph-bold ph-trash"></i></button>
+                                </form>
+                            </td>
+                        </tr>
+                    <?php endforeach; endif; ?>
+                </tbody>
+            </table>
+        </div>
     </div>
 
-    <!-- Pagination -->
     <?php if (isset($totalPages) && $totalPages > 1): ?>
         <div class="pagination">
             <?php for($i = 1; $i <= $totalPages; $i++): ?>

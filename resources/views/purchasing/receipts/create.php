@@ -3,8 +3,85 @@
 
 if (session_status() === PHP_SESSION_NONE) session_start();
 $isRtl = ($_SESSION['locale'] ?? 'ar') === 'ar';
+$currency = current_currency();
+
 $isEdit = isset($receipt) && $receipt !== null;
 $actionUrl = $isEdit ? "/ERP/purchasing/receipts/{$receipt->id}/update" : "/ERP/purchasing/receipts/store";
+
+$t = [
+    'ar' => [
+        'title_new' => 'إصدار إذن استلام بضائع جديد (GRN)',
+        'title_edit' => 'تعديل إذن استلام بضائع',
+        'basic_info' => 'البيانات الأساسية للإذن',
+        'supplier' => 'المورد',
+        'select_supplier' => '-- اختر المورد --',
+        'po_link' => 'ربط بأمر شراء (اختياري)',
+        'no_po' => '-- مباشر / بدون أمر شراء --',
+        'receipt_num' => 'رقم إذن الاستلام (GRN Number)',
+        'receipt_placeholder' => 'تلقائي',
+        'delivery_note' => 'رقم إذن التسليم / البوليصة من المورد',
+        'delivery_note_placeholder' => 'مثال: DN-88492',
+        'receipt_date' => 'تاريخ الاستلام',
+        'received_by' => 'مستلم البضائع بالمخزن',
+        'received_by_placeholder' => 'اسم أمين المخزن',
+        'status' => 'حالة الفحص والاستلام',
+        'status_inspected' => 'قيد الفحص',
+        'status_accepted' => 'مقبول ومستلم بالمخزن',
+        'status_rejected' => 'مرفوض بالكامل',
+        'status_draft' => 'مسودة',
+        'notes' => 'ملاحظات الفحص والاستلام',
+        'notes_placeholder' => 'أي تلفيات أو ملاحظات على حالة الشحنة...',
+        'items_title' => 'أصناف الشحنة المستلمة',
+        'add_item' => 'إضافة صنف',
+        'col_prod' => 'الصنف (الكود والاسم)',
+        'col_desc' => 'الوصف',
+        'col_qty_rec' => 'الكمية المستلمة',
+        'col_qty_acc' => 'الكمية المقبولة',
+        'col_qty_rej' => 'الكمية المرفوضة',
+        'col_price' => 'سعر الوحدة',
+        'col_actions' => 'إزالة',
+        'unregistered' => '-- غير مسجل / يدوي --',
+        'cancel' => 'إلغاء وتراجع',
+        'save' => 'حفظ وإصدار إذن الاستلام',
+        'update' => 'تحديث الإذن'
+    ],
+    'en' => [
+        'title_new' => 'Issue Goods Receipt Note (GRN)',
+        'title_edit' => 'Edit Goods Receipt Note',
+        'basic_info' => 'Basic GRN Details',
+        'supplier' => 'Supplier',
+        'select_supplier' => '-- Select Supplier --',
+        'po_link' => 'Link to Purchase Order (Optional)',
+        'no_po' => '-- Direct / No PO --',
+        'receipt_num' => 'GRN Number',
+        'receipt_placeholder' => 'Auto',
+        'delivery_note' => 'Vendor Delivery Note / Waybill No.',
+        'delivery_note_placeholder' => 'e.g. DN-88492',
+        'receipt_date' => 'Receipt Date',
+        'received_by' => 'Storekeeper / Receiver',
+        'received_by_placeholder' => 'Storekeeper Name',
+        'status' => 'Inspection & Receipt Status',
+        'status_inspected' => 'Under Inspection',
+        'status_accepted' => 'Accepted & Stocked',
+        'status_rejected' => 'Rejected Completely',
+        'status_draft' => 'Draft',
+        'notes' => 'Inspection & Receipt Notes',
+        'notes_placeholder' => 'Any damage or condition remarks...',
+        'items_title' => 'Received Shipment Items',
+        'add_item' => 'Add Item',
+        'col_prod' => 'Product (Code & Name)',
+        'col_desc' => 'Description',
+        'col_qty_rec' => 'Qty Received',
+        'col_qty_acc' => 'Qty Accepted',
+        'col_qty_rej' => 'Qty Rejected',
+        'col_price' => 'Unit Price',
+        'col_actions' => 'Remove',
+        'unregistered' => '-- Unregistered / Manual --',
+        'cancel' => 'Cancel',
+        'save' => 'Save & Issue GRN',
+        'update' => 'Update GRN'
+    ]
+][$isRtl ? 'ar' : 'en'];
 ?>
 
 <style>
@@ -49,7 +126,7 @@ $actionUrl = $isEdit ? "/ERP/purchasing/receipts/{$receipt->id}/update" : "/ERP/
 <div class="form-wrapper" dir="<?= $isRtl ? 'rtl' : 'ltr' ?>">
     <div class="form-header">
         <a href="/ERP/purchasing/receipts" class="back-btn"><i class="ph-bold <?= $isRtl ? 'ph-arrow-right' : 'ph-arrow-left' ?>"></i></a>
-        <h2 class="form-title"><?= $isEdit ? 'تعديل إذن استلام بضائع' : 'إصدار إذن استلام بضائع جديد (GRN)' ?></h2>
+        <h2 class="form-title"><?= $isEdit ? $t['title_edit'] : $t['title_new'] ?></h2>
     </div>
 
     <?php if(isset($_SESSION['flash_err'])): ?>
@@ -58,12 +135,12 @@ $actionUrl = $isEdit ? "/ERP/purchasing/receipts/{$receipt->id}/update" : "/ERP/
 
     <form action="<?= $actionUrl ?>" method="POST">
         <div class="panel-card">
-            <h3 class="panel-title"><i class="ph-duotone ph-info" style="color:var(--c-emerald);"></i> البيانات الأساسية للإذن</h3>
+            <h3 class="panel-title"><i class="ph-duotone ph-info" style="color:var(--c-emerald);"></i> <?= $t['basic_info'] ?></h3>
             <div class="grid-3">
                 <div>
-                    <label class="input-label">المورد <span style="color:red">*</span></label>
+                    <label class="input-label"><?= $t['supplier'] ?> <span style="color:red">*</span></label>
                     <select name="supplier_id" class="form-control" required>
-                        <option value="">-- اختر المورد --</option>
+                        <option value=""><?= $t['select_supplier'] ?></option>
                         <?php foreach($suppliers ?? [] as $s): ?>
                             <option value="<?= $s->id ?>" <?= ($isEdit && $receipt->supplier_id == $s->id) ? 'selected' : '' ?>>
                                 <?= htmlspecialchars($s->name_ar) ?> <?= !empty($s->code) ? "({$s->code})" : '' ?>
@@ -72,9 +149,9 @@ $actionUrl = $isEdit ? "/ERP/purchasing/receipts/{$receipt->id}/update" : "/ERP/
                     </select>
                 </div>
                 <div>
-                    <label class="input-label">ربط بأمر شراء (اختياري)</label>
+                    <label class="input-label"><?= $t['po_link'] ?></label>
                     <select name="po_id" class="form-control">
-                        <option value="">-- مباشر / بدون أمر شراء --</option>
+                        <option value=""><?= $t['no_po'] ?></option>
                         <?php foreach($orders ?? [] as $po): ?>
                             <option value="<?= $po->id ?>" <?= ($isEdit && $receipt->po_id == $po->id) ? 'selected' : '' ?>>
                                 <?= htmlspecialchars($po->po_number) ?>
@@ -83,60 +160,60 @@ $actionUrl = $isEdit ? "/ERP/purchasing/receipts/{$receipt->id}/update" : "/ERP/
                     </select>
                 </div>
                 <div>
-                    <label class="input-label">رقم إذن الاستلام (GRN Number)</label>
-                    <input type="text" name="receipt_number" class="form-control" style="font-family:monospace; color:var(--c-emerald); font-weight:bold;" value="<?= $isEdit ? htmlspecialchars($receipt->receipt_number) : '' ?>" <?= $isEdit ? 'readonly' : 'placeholder="تلقائي"' ?>>
+                    <label class="input-label"><?= $t['receipt_num'] ?></label>
+                    <input type="text" name="receipt_number" class="form-control" style="font-family:monospace; color:var(--c-emerald); font-weight:bold;" value="<?= $isEdit ? htmlspecialchars($receipt->receipt_number) : '' ?>" <?= $isEdit ? 'readonly' : 'placeholder="'.$t['receipt_placeholder'].'"' ?>>
                 </div>
             </div>
 
             <div class="grid-3" style="margin-top: 24px;">
                 <div>
-                    <label class="input-label">رقم إذن التسليم / البوليصة من المورد</label>
-                    <input type="text" name="delivery_note_number" class="form-control" value="<?= $isEdit ? htmlspecialchars($receipt->delivery_note_number ?? '') : '' ?>" placeholder="مثال: DN-88492">
+                    <label class="input-label"><?= $t['delivery_note'] ?></label>
+                    <input type="text" name="delivery_note_number" class="form-control" value="<?= $isEdit ? htmlspecialchars($receipt->delivery_note_number ?? '') : '' ?>" placeholder="<?= $t['delivery_note_placeholder'] ?>">
                 </div>
                 <div>
-                    <label class="input-label">تاريخ الاستلام <span style="color:red">*</span></label>
+                    <label class="input-label"><?= $t['receipt_date'] ?> <span style="color:red">*</span></label>
                     <input type="date" name="receipt_date" class="form-control" value="<?= $isEdit ? htmlspecialchars($receipt->receipt_date) : date('Y-m-d') ?>" required>
                 </div>
                 <div>
-                    <label class="input-label">مستلم البضائع بالمخزن</label>
-                    <input type="text" name="received_by" class="form-control" value="<?= $isEdit ? htmlspecialchars($receipt->received_by ?? '') : '' ?>" placeholder="اسم أمين المخزن">
+                    <label class="input-label"><?= $t['received_by'] ?></label>
+                    <input type="text" name="received_by" class="form-control" value="<?= $isEdit ? htmlspecialchars($receipt->received_by ?? '') : '' ?>" placeholder="<?= $t['received_by_placeholder'] ?>">
                 </div>
             </div>
 
             <div class="grid-2" style="margin-top: 24px;">
                 <div>
-                    <label class="input-label">حالة الفحص والاستلام</label>
+                    <label class="input-label"><?= $t['status'] ?></label>
                     <select name="status" class="form-control" style="font-weight: 800;">
                         <?php $st = $isEdit ? $receipt->status : 'accepted'; ?>
-                        <option value="inspected" <?= $st=='inspected' ? 'selected' : '' ?>>قيد الفحص</option>
-                        <option value="accepted" <?= $st=='accepted' ? 'selected' : '' ?>>مقبول ومستلم بالمخزن</option>
-                        <option value="rejected" <?= $st=='rejected' ? 'selected' : '' ?>>مرفوض بالكامل</option>
-                        <option value="draft" <?= $st=='draft' ? 'selected' : '' ?>>مسودة</option>
+                        <option value="inspected" <?= $st=='inspected' ? 'selected' : '' ?>><?= $t['status_inspected'] ?></option>
+                        <option value="accepted" <?= $st=='accepted' ? 'selected' : '' ?>><?= $t['status_accepted'] ?></option>
+                        <option value="rejected" <?= $st=='rejected' ? 'selected' : '' ?>><?= $t['status_rejected'] ?></option>
+                        <option value="draft" <?= $st=='draft' ? 'selected' : '' ?>><?= $t['status_draft'] ?></option>
                     </select>
                 </div>
                 <div>
-                    <label class="input-label">ملاحظات الفحص والاستلام</label>
-                    <input type="text" name="notes" class="form-control" value="<?= $isEdit ? htmlspecialchars($receipt->notes ?? '') : '' ?>" placeholder="أي تلفيات أو ملاحظات على حالة الشحنة...">
+                    <label class="input-label"><?= $t['notes'] ?></label>
+                    <input type="text" name="notes" class="form-control" value="<?= $isEdit ? htmlspecialchars($receipt->notes ?? '') : '' ?>" placeholder="<?= $t['notes_placeholder'] ?>">
                 </div>
             </div>
         </div>
 
         <div class="panel-card">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                <h3 class="panel-title" style="margin:0; border:none; padding:0;"><i class="ph-duotone ph-list-numbers" style="color:var(--c-emerald);"></i> أصناف الشحنة المستلمة</h3>
-                <button type="button" onclick="addRow()" class="btn-add-row"><i class="ph-bold ph-plus"></i> إضافة صنف</button>
+                <h3 class="panel-title" style="margin:0; border:none; padding:0;"><i class="ph-duotone ph-list-numbers" style="color:var(--c-emerald);"></i> <?= $t['items_title'] ?></h3>
+                <button type="button" onclick="addRow()" class="btn-add-row"><i class="ph-bold ph-plus"></i> <?= $t['add_item'] ?></button>
             </div>
             
             <table class="items-table" id="itemsTable">
                 <thead>
                     <tr>
-                        <th style="width: 25%;">الصنف (الكود والاسم)</th>
-                        <th style="width: 25%;">الوصف <span style="color:red">*</span></th>
-                        <th style="width: 11%; text-align: center;">الكمية المستلمة</th>
-                        <th style="width: 11%; text-align: center;">الكمية المقبولة</th>
-                        <th style="width: 11%; text-align: center;">الكمية المرفوضة</th>
-                        <th style="width: 12%; text-align: center;">سعر الوحدة</th>
-                        <th style="width: 5%; text-align: center;">إزالة</th>
+                        <th style="width: 25%;"><?= $t['col_prod'] ?></th>
+                        <th style="width: 25%;"><?= $t['col_desc'] ?> <span style="color:red">*</span></th>
+                        <th style="width: 11%; text-align: center;"><?= $t['col_qty_rec'] ?></th>
+                        <th style="width: 11%; text-align: center;"><?= $t['col_qty_acc'] ?></th>
+                        <th style="width: 11%; text-align: center;"><?= $t['col_qty_rej'] ?></th>
+                        <th style="width: 12%; text-align: center;"><?= $t['col_price'] ?> (<?= $currency ?>)</th>
+                        <th style="width: 5%; text-align: center;"><?= $t['col_actions'] ?></th>
                     </tr>
                 </thead>
                 <tbody id="itemsBody">
@@ -144,7 +221,7 @@ $actionUrl = $isEdit ? "/ERP/purchasing/receipts/{$receipt->id}/update" : "/ERP/
                         <tr>
                             <td>
                                 <select name="product_id[]" class="form-control">
-                                    <option value="">-- غير مسجل --</option>
+                                    <option value=""><?= $t['unregistered'] ?></option>
                                     <?php foreach($products ?? [] as $p): ?>
                                         <option value="<?= $p->id ?>" <?= $item->product_id == $p->id ? 'selected' : '' ?>>
                                             <?= htmlspecialchars($p->code) ?><?= !empty($p->name) ? ' - ' . htmlspecialchars($p->name) : '' ?>
@@ -165,8 +242,8 @@ $actionUrl = $isEdit ? "/ERP/purchasing/receipts/{$receipt->id}/update" : "/ERP/
         </div>
 
         <div class="sticky-footer">
-            <a href="/ERP/purchasing/receipts" class="btn-cancel">إلغاء وتراجع</a>
-            <button type="submit" class="btn-submit"><i class="ph-bold ph-floppy-disk"></i> <?= $isEdit ? 'تحديث الإذن' : 'حفظ وإصدار إذن الاستلام' ?></button>
+            <a href="/ERP/purchasing/receipts" class="btn-cancel"><?= $t['cancel'] ?></a>
+            <button type="submit" class="btn-submit"><i class="ph-bold ph-floppy-disk"></i> <?= $isEdit ? $t['update'] : $t['save'] ?></button>
         </div>
     </form>
 </div>
@@ -175,7 +252,7 @@ $actionUrl = $isEdit ? "/ERP/purchasing/receipts/{$receipt->id}/update" : "/ERP/
     <tr>
         <td>
             <select name="product_id[]" class="form-control">
-                <option value="">-- غير مسجل --</option>
+                <option value=""><?= $t['unregistered'] ?></option>
                 <?php foreach($products ?? [] as $p): ?>
                     <option value="<?= $p->id ?>">
                         <?= htmlspecialchars($p->code) ?><?= !empty($p->name) ? ' - ' . htmlspecialchars($p->name) : '' ?>
@@ -183,7 +260,7 @@ $actionUrl = $isEdit ? "/ERP/purchasing/receipts/{$receipt->id}/update" : "/ERP/
                 <?php endforeach; ?>
             </select>
         </td>
-        <td><input type="text" name="description[]" class="form-control" placeholder="الوصف..." required></td>
+        <td><input type="text" name="description[]" class="form-control" required></td>
         <td><input type="number" step="0.01" name="quantity_received[]" class="form-control" style="text-align:center; font-weight:700;" value="1.00" required></td>
         <td><input type="number" step="0.01" name="quantity_accepted[]" class="form-control" style="text-align:center; font-weight:700; color:#059669;" value="1.00" required></td>
         <td><input type="number" step="0.01" name="quantity_rejected[]" class="form-control" style="text-align:center; font-weight:700; color:#dc2626;" value="0.00"></td>

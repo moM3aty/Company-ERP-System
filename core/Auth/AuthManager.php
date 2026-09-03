@@ -51,12 +51,13 @@ class AuthManager {
 
         $userPerms = $_SESSION['user_permissions'] ?? [];
 
-        foreach ($userPerms as $perm) {
-            $perm = strtolower($perm);
-            if ($perm === $permKey || $perm === $shortKey || str_contains($perm, strtolower($resource))) {
-                return true;
-            }
-        }
+       foreach ($userPerms as $perm) {
+    $perm = strtolower($perm);
+    // السماح إذا تطابق المفتاح بالكامل، أو إذا كان يمتلك صلاحية شاملة للموديول (مثال: sales.*)
+    if ($perm === $permKey || $perm === $shortKey || $perm === strtolower("{$module}.*")) {
+        return true;
+    }
+}
 
         return false;
     }

@@ -18,10 +18,7 @@ class MilestoneController extends Controller
 
     public function __construct()
     {
-        ini_set('display_errors', 1);
-        ini_set('display_startup_errors', 1);
-        error_reporting(E_ALL);
-
+        ini_set('display_errors', 0);
         global $basePath, $app;
         $this->basePath = $basePath ?? dirname(__DIR__, 4);
         if ($app && $app->has(PDO::class)) {
@@ -42,6 +39,10 @@ class MilestoneController extends Controller
 
     public function index(Request $request, Response $response): Response
     {
+        if (session_status() === PHP_SESSION_NONE) session_start();
+        $companyId = $_SESSION['company_id'] ?? 1;
+        $branchId  = $_SESSION['branch_id'] ?? 0;
+
         $uri = $_SERVER['REQUEST_URI'] ?? '';
         if (preg_match('#/projects/milestones/(\d+)/edit#', $uri, $m)) return $this->edit($request, $response, (int)$m[1]);
         if (preg_match('#/projects/milestones/(\d+)/update#', $uri, $m)) return $this->update($request, $response, (int)$m[1]);
@@ -70,15 +71,21 @@ class MilestoneController extends Controller
 
         if ($this->db) {
             try {
-                $projects = $this->db->query("SELECT id, code, name_ar FROM projects ORDER BY id DESC")->fetchAll(PDO::FETCH_OBJ) ?: [];
+                $bCond = $branchId > 0 ? " AND (branch_id = $branchId OR branch_id IS NULL OR branch_id = 0)" : "";
+                $projects = $this->db->query("SELECT id, code, COALESCE(name_ar, name_en) as name_ar FROM projects WHERE company_id = $companyId $bCond ORDER BY id DESC")->fetchAll(PDO::FETCH_OBJ) ?: [];
 
-                $where = ["1=1"];
-                $params = [];
+                $where = ["m.company_id = ?"];
+                $params = [$companyId];
+
+                if ($branchId > 0) {
+                    $where[] = "(m.branch_id = ? OR m.branch_id IS NULL OR m.branch_id = 0)";
+                    $params[] = $branchId;
+                }
 
                 if ($search !== '') {
-                    $where[] = "(m.milestone_code LIKE ? OR m.title_ar LIKE ? OR m.assigned_to LIKE ? OR p.name_ar LIKE ?)";
+                    $where[] = "(m.milestone_code LIKE ? OR m.title_ar LIKE ? OR m.title_en LIKE ? OR m.assigned_to LIKE ? OR p.name_ar LIKE ?)";
                     $like = "%{$search}%";
-                    $params = array_merge($params, [$like, $like, $like, $like]);
+                    $params = array_merge($params, [$like, $like, $like, $like, $like]);
                 }
 
                 if ($projectId !== '') {
@@ -109,7 +116,7 @@ class MilestoneController extends Controller
                 $totalPages = max(1, ceil($totalCount / $limit));
 
                 $stmt = $this->db->prepare("
-                    SELECT m.*, p.name_ar as project_name, p.code as project_code
+                    SELECT m.*, COALESCE(p.name_ar, p.name_en) as project_name, p.code as project_code
                     FROM project_milestones m
                     LEFT JOIN projects p ON m.project_id = p.id
                     $whereSql
@@ -119,17 +126,27 @@ class MilestoneController extends Controller
                 $stmt->execute($params);
                 $milestones = $stmt->fetchAll(PDO::FETCH_OBJ) ?: [];
 
-                $statsData = $this->db->query("
+                // تحويل التكاليف التقديرية والفعلية
+                foreach ($milestones as $m) {
+                    $m->estimated_cost = convert_amount($m->estimated_cost);
+                    $m->actual_cost = convert_amount($m->actual_cost);
+                }
+
+                $statsStmt = $this->db->prepare("
                     SELECT 
                         COUNT(*) as total_milestones,
                         SUM(IF(status = 'in_progress', 1, 0)) as in_progress_count,
                         SUM(IF(status = 'completed', 1, 0)) as completed_count,
                         SUM(IF(status = 'delayed' OR (due_date < CURRENT_DATE() AND status NOT IN ('completed','cancelled')), 1, 0)) as delayed_count,
                         COALESCE(SUM(estimated_cost), 0) as total_estimated_cost
-                    FROM project_milestones
-                ")->fetch(PDO::FETCH_OBJ);
+                    FROM project_milestones m
+                    WHERE m.company_id = ? " . ($branchId > 0 ? " AND (m.branch_id = $branchId OR m.branch_id IS NULL OR m.branch_id = 0)" : "") . "
+                ");
+                $statsStmt->execute([$companyId]);
+                $statsData = $statsStmt->fetch(PDO::FETCH_OBJ);
                 if ($statsData) {
                     $stats = $statsData;
+                    $stats->total_estimated_cost = convert_amount($stats->total_estimated_cost);
                 }
 
             } catch (Throwable $e) {
@@ -154,14 +171,19 @@ class MilestoneController extends Controller
 
     public function create(Request $request, Response $response): Response
     {
+        if (session_status() === PHP_SESSION_NONE) session_start();
+        $companyId = $_SESSION['company_id'] ?? 1;
+        $branchId  = $_SESSION['branch_id'] ?? 0;
+
         $milestone = null; 
         $projects = [];
         $autoCode = 'MS-' . date('Y') . '-0001';
 
         if ($this->db) {
             try {
-                $projects = $this->db->query("SELECT id, code, name_ar FROM projects ORDER BY id DESC")->fetchAll(PDO::FETCH_OBJ) ?: [];
-                $nextSeq = (int)$this->db->query("SELECT COUNT(*) FROM project_milestones")->fetchColumn() + 1;
+                $bCond = $branchId > 0 ? " AND (branch_id = $branchId OR branch_id IS NULL OR branch_id = 0)" : "";
+                $projects = $this->db->query("SELECT id, code, COALESCE(name_ar, name_en) as name_ar FROM projects WHERE company_id = $companyId $bCond ORDER BY id DESC")->fetchAll(PDO::FETCH_OBJ) ?: [];
+                $nextSeq = (int)$this->db->query("SELECT COUNT(*) FROM project_milestones WHERE company_id = $companyId")->fetchColumn() + 1;
                 $autoCode = 'MS-' . date('Y') . '-' . str_pad($nextSeq, 4, '0', STR_PAD_LEFT);
             } catch (Throwable $e) {}
         }
@@ -177,38 +199,56 @@ class MilestoneController extends Controller
     {
         $data = $_POST;
         if (session_status() === PHP_SESSION_NONE) session_start();
+        $isAr = ($_SESSION['locale'] ?? 'ar') === 'ar';
+        $companyId = $_SESSION['company_id'] ?? 1;
+        $branchId  = $_SESSION['branch_id'] ?? 0;
 
         try {
-            if (!$this->db) throw new Exception("اتصال قاعدة البيانات غير متوفر.");
+            if (!$this->db) throw new Exception("Database connection unavailable.");
 
             if (empty($data['milestone_code']) || empty($data['title_ar']) || empty($data['project_id']) || empty($data['start_date']) || empty($data['due_date'])) {
-                throw new Exception("يرجى تعبئة كافة الحقول الأساسية للمرحلة/المهمة.");
+                throw new Exception($isAr ? "يرجى تعبئة كافة الحقول الأساسية للمرحلة." : "Please fill all required fields.");
             }
 
-            $stmt = $this->db->prepare("
-                INSERT INTO project_milestones 
-                (project_id, milestone_code, title_ar, title_en, assigned_to, start_date, due_date, completion_date, progress_percent, estimated_cost, actual_cost, status, priority, description, created_by)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ");
-            $stmt->execute([
-                (int)$data['project_id'],
-                trim($data['milestone_code']),
-                trim($data['title_ar']),
-                trim($data['title_en'] ?? ''),
-                trim($data['assigned_to'] ?? ''),
-                $data['start_date'],
-                $data['due_date'],
-                !empty($data['completion_date']) ? $data['completion_date'] : null,
-                !empty($data['progress_percent']) ? (float)$data['progress_percent'] : 0.00,
-                !empty($data['estimated_cost']) ? (float)$data['estimated_cost'] : 0.00,
-                !empty($data['actual_cost']) ? (float)$data['actual_cost'] : 0.00,
-                $data['status'] ?? 'pending',
-                $data['priority'] ?? 'medium',
-                trim($data['description'] ?? ''),
-                $_SESSION['user_id'] ?? 1
-            ]);
+            try {
+                $stmt = $this->db->prepare("
+                    INSERT INTO project_milestones 
+                    (company_id, branch_id, project_id, milestone_code, title_ar, title_en, assigned_to, start_date, due_date, completion_date, progress_percent, estimated_cost, actual_cost, status, priority, description, created_by)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ");
+                $stmt->execute([
+                    $companyId, $branchId,
+                    (int)$data['project_id'], trim($data['milestone_code']),
+                    trim($data['title_ar']), trim($data['title_en'] ?? ''),
+                    trim($data['assigned_to'] ?? ''), $data['start_date'], $data['due_date'],
+                    !empty($data['completion_date']) ? $data['completion_date'] : null,
+                    !empty($data['progress_percent']) ? (float)$data['progress_percent'] : 0.00,
+                    !empty($data['estimated_cost']) ? (float)$data['estimated_cost'] : 0.00,
+                    !empty($data['actual_cost']) ? (float)$data['actual_cost'] : 0.00,
+                    $data['status'] ?? 'pending', $data['priority'] ?? 'medium',
+                    trim($data['description'] ?? ''), $_SESSION['user_id'] ?? 1
+                ]);
+            } catch (\PDOException $ex) {
+                // Fallback
+                $stmt = $this->db->prepare("
+                    INSERT INTO project_milestones 
+                    (project_id, milestone_code, title_ar, title_en, assigned_to, start_date, due_date, completion_date, progress_percent, estimated_cost, actual_cost, status, priority, description, created_by)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ");
+                $stmt->execute([
+                    (int)$data['project_id'], trim($data['milestone_code']),
+                    trim($data['title_ar']), trim($data['title_en'] ?? ''),
+                    trim($data['assigned_to'] ?? ''), $data['start_date'], $data['due_date'],
+                    !empty($data['completion_date']) ? $data['completion_date'] : null,
+                    !empty($data['progress_percent']) ? (float)$data['progress_percent'] : 0.00,
+                    !empty($data['estimated_cost']) ? (float)$data['estimated_cost'] : 0.00,
+                    !empty($data['actual_cost']) ? (float)$data['actual_cost'] : 0.00,
+                    $data['status'] ?? 'pending', $data['priority'] ?? 'medium',
+                    trim($data['description'] ?? ''), $_SESSION['user_id'] ?? 1
+                ]);
+            }
 
-            $_SESSION['flash_msg'] = "تم إنشاء وتسجيل المرحلة/المهمة بنجاح.";
+            $_SESSION['flash_msg'] = $isAr ? "تم تسجيل المرحلة/المهمة بنجاح." : "Milestone created successfully.";
         } catch (Throwable $e) {
             $_SESSION['flash_err'] = $e->getMessage();
             return new RedirectResponse('/ERP/projects/milestones/create');
@@ -221,21 +261,24 @@ class MilestoneController extends Controller
     {
         $id = $this->resolveId($id);
         if (session_status() === PHP_SESSION_NONE) session_start();
+        $companyId = $_SESSION['company_id'] ?? 1;
+        $branchId  = $_SESSION['branch_id'] ?? 0;
 
         $milestone = null;
         $projects = [];
         $autoCode = '';
 
         try {
-            if (!$this->db) throw new Exception("اتصال قاعدة البيانات غير متوفر.");
+            if (!$this->db) throw new Exception("Database connection unavailable.");
 
-            $stmt = $this->db->prepare("SELECT * FROM project_milestones WHERE id = ?");
-            $stmt->execute([$id]);
+            $stmt = $this->db->prepare("SELECT * FROM project_milestones WHERE id = ? AND company_id = ?");
+            $stmt->execute([$id, $companyId]);
             $milestone = $stmt->fetch(PDO::FETCH_OBJ);
 
             if (!$milestone) throw new Exception("بيانات المرحلة غير موجودة.");
 
-            $projects = $this->db->query("SELECT id, code, name_ar FROM projects ORDER BY id DESC")->fetchAll(PDO::FETCH_OBJ) ?: [];
+            $bCond = $branchId > 0 ? " AND (branch_id = $branchId OR branch_id IS NULL OR branch_id = 0)" : "";
+            $projects = $this->db->query("SELECT id, code, COALESCE(name_ar, name_en) as name_ar FROM projects WHERE company_id = $companyId $bCond ORDER BY id DESC")->fetchAll(PDO::FETCH_OBJ) ?: [];
             $autoCode = $milestone->milestone_code;
 
         } catch (Throwable $e) {
@@ -255,33 +298,29 @@ class MilestoneController extends Controller
         $id = $this->resolveId($id);
         $data = $_POST;
         if (session_status() === PHP_SESSION_NONE) session_start();
+        $isAr = ($_SESSION['locale'] ?? 'ar') === 'ar';
+        $companyId = $_SESSION['company_id'] ?? 1;
 
         try {
-            if (!$this->db) throw new Exception("اتصال قاعدة البيانات غير متوفر.");
+            if (!$this->db) throw new Exception("Database connection unavailable.");
 
             $stmt = $this->db->prepare("
                 UPDATE project_milestones 
                 SET project_id = ?, title_ar = ?, title_en = ?, assigned_to = ?, start_date = ?, due_date = ?, completion_date = ?, progress_percent = ?, estimated_cost = ?, actual_cost = ?, status = ?, priority = ?, description = ?
-                WHERE id = ?
+                WHERE id = ? AND company_id = ?
             ");
             $stmt->execute([
-                (int)$data['project_id'],
-                trim($data['title_ar']),
-                trim($data['title_en'] ?? ''),
-                trim($data['assigned_to'] ?? ''),
-                $data['start_date'],
-                $data['due_date'],
+                (int)$data['project_id'], trim($data['title_ar']), trim($data['title_en'] ?? ''),
+                trim($data['assigned_to'] ?? ''), $data['start_date'], $data['due_date'],
                 !empty($data['completion_date']) ? $data['completion_date'] : null,
                 !empty($data['progress_percent']) ? (float)$data['progress_percent'] : 0.00,
                 !empty($data['estimated_cost']) ? (float)$data['estimated_cost'] : 0.00,
                 !empty($data['actual_cost']) ? (float)$data['actual_cost'] : 0.00,
-                $data['status'] ?? 'pending',
-                $data['priority'] ?? 'medium',
-                trim($data['description'] ?? ''),
-                $id
+                $data['status'] ?? 'pending', $data['priority'] ?? 'medium',
+                trim($data['description'] ?? ''), $id, $companyId
             ]);
 
-            $_SESSION['flash_msg'] = "تم تحديث بيانات المرحلة/المهمة بنجاح.";
+            $_SESSION['flash_msg'] = $isAr ? "تم تحديث المهمة بنجاح." : "Milestone updated successfully.";
         } catch (Throwable $e) {
             $_SESSION['flash_err'] = $e->getMessage();
             return new RedirectResponse("/ERP/projects/milestones/{$id}/edit");
@@ -294,14 +333,15 @@ class MilestoneController extends Controller
     {
         $id = $this->resolveId($id);
         if (session_status() === PHP_SESSION_NONE) session_start();
+        $companyId = $_SESSION['company_id'] ?? 1;
 
         try {
             if ($this->db) {
-                $this->db->prepare("DELETE FROM project_milestones WHERE id = ?")->execute([$id]);
+                $this->db->prepare("DELETE FROM project_milestones WHERE id = ? AND company_id = ?")->execute([$id, $companyId]);
                 $_SESSION['flash_msg'] = "تم حذف المرحلة/المهمة بنجاح.";
             }
         } catch (Throwable $e) {
-            $_SESSION['flash_err'] = $e->getMessage();
+            $_SESSION['flash_err'] = "خطأ أثناء عملية الحذف.";
         }
 
         return new RedirectResponse('/ERP/projects/milestones');
@@ -310,24 +350,30 @@ class MilestoneController extends Controller
     public function show(Request $request, Response $response, $id = null): Response
     {
         $id = $this->resolveId($id);
+        if (session_status() === PHP_SESSION_NONE) session_start();
+        $companyId = $_SESSION['company_id'] ?? 1;
+
         $milestone = null;
 
         if ($this->db) {
             $stmt = $this->db->prepare("
-                SELECT m.*, p.name_ar as project_name, p.code as project_code
+                SELECT m.*, COALESCE(p.name_ar, p.name_en) as project_name, p.code as project_code
                 FROM project_milestones m
                 LEFT JOIN projects p ON m.project_id = p.id
-                WHERE m.id = ?
+                WHERE m.id = ? AND m.company_id = ?
             ");
-            $stmt->execute([$id]);
+            $stmt->execute([$id, $companyId]);
             $milestone = $stmt->fetch(PDO::FETCH_OBJ);
         }
 
         if (!$milestone) {
-            if (session_status() === PHP_SESSION_NONE) session_start();
             $_SESSION['flash_err'] = "سجل المرحلة غير موجود.";
             return new RedirectResponse('/ERP/projects/milestones');
         }
+
+        // تحويل المبالغ
+        $milestone->estimated_cost = convert_amount($milestone->estimated_cost);
+        $milestone->actual_cost = convert_amount($milestone->actual_cost);
 
         return $this->renderView('/resources/views/projects/milestones/show.php', [
             'milestone' => $milestone
@@ -340,9 +386,8 @@ class MilestoneController extends Controller
         $fullPath = $this->basePath . $viewPath;
 
         if (!file_exists($fullPath)) {
-            die("<div style='padding:30px; background:#fff; color:#dc2626; font-family:monospace; direction:ltr;'><h3>View File Missing:</h3>" . htmlspecialchars($fullPath) . "</div>");
+            die("<div style='padding:30px; background:#fff; color:#dc2626;'>View Missing: " . htmlspecialchars($fullPath) . "</div>");
         }
-
         try {
             ob_start();
             include $fullPath;
@@ -353,12 +398,7 @@ class MilestoneController extends Controller
             return $response->setContent(ob_get_clean())->setHeader('Content-Type', 'text/html; charset=UTF-8');
         } catch (Throwable $e) {
             ob_end_clean();
-            die("<div style='padding:30px; background:#fff; color:#dc2626; font-family:monospace; direction:ltr;'>
-                    <h3>Milestones View Error:</h3>
-                    <p><b>Message:</b> " . htmlspecialchars($e->getMessage()) . "</p>
-                    <p><b>File:</b> " . htmlspecialchars($e->getFile()) . "</p>
-                    <p><b>Line:</b> " . $e->getLine() . "</p>
-                 </div>");
+            die("<div style='padding:30px; background:#fff; color:#dc2626;'>View Error: " . htmlspecialchars($e->getMessage()) . "</div>");
         }
     }
 }

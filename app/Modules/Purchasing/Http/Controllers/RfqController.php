@@ -9,6 +9,7 @@ use Core\Http\Response;
 use Core\Http\RedirectResponse;
 use PDO;
 use Exception;
+use Throwable;
 
 class RfqController extends Controller
 {
@@ -17,11 +18,7 @@ class RfqController extends Controller
 
     public function __construct()
     {
-        // 1. تفعيل إظهار الأخطاء لكشف أي مشكلة مخفية
-        ini_set('display_errors', 1);
-        ini_set('display_startup_errors', 1);
-        error_reporting(E_ALL);
-
+        ini_set('display_errors', 0);
         global $basePath, $app;
         $this->basePath = $basePath ?? dirname(__DIR__, 4);
         
@@ -31,8 +28,12 @@ class RfqController extends Controller
         }
     }
 
-public function index(Request $request, Response $response): Response
+    public function index(Request $request, Response $response): Response
     {
+        if (session_status() === PHP_SESSION_NONE) session_start();
+        $companyId = $_SESSION['company_id'] ?? 1;
+        $branchId  = $_SESSION['branch_id'] ?? 0;
+
         $dbError = null;
         $search = trim($_GET['search'] ?? '');
         $page = max(1, (int)($_GET['page'] ?? 1));
@@ -40,12 +41,18 @@ public function index(Request $request, Response $response): Response
         $offset = ($page - 1) * $limit;
 
         try {
-            $whereClause = "";
-            $params = [];
+            $whereClause = "WHERE r.company_id = ?";
+            $params = [$companyId];
+
+            if ($branchId > 0) {
+                $whereClause .= " AND (r.branch_id = ? OR r.branch_id IS NULL OR r.branch_id = 0)";
+                $params[] = $branchId;
+            }
+
             if ($search !== '') {
-                $whereClause = "WHERE r.rfq_number LIKE ? OR r.title LIKE ?";
+                $whereClause .= " AND (r.rfq_number LIKE ? OR r.title LIKE ?)";
                 $like = "%{$search}%";
-                $params = [$like, $like];
+                $params = array_merge($params, [$like, $like]);
             }
 
             $countStmt = $this->db->prepare("SELECT COUNT(*) FROM rfqs r $whereClause");
@@ -62,8 +69,7 @@ public function index(Request $request, Response $response): Response
                 ORDER BY r.id DESC LIMIT $limit OFFSET $offset
             ");
             $stmt->execute($params);
-            $rfqs = $stmt->fetchAll(PDO::FETCH_OBJ);
-            if ($rfqs === false) $rfqs = [];
+            $rfqs = $stmt->fetchAll(PDO::FETCH_OBJ) ?: [];
 
             $today = date('Y-m-d');
             foreach ($rfqs as $r) {
@@ -72,8 +78,9 @@ public function index(Request $request, Response $response): Response
                     $r->status = 'closed';
                 }
             }
-        } catch (Exception $e) {
+        } catch (Throwable $e) {
             $rfqs = [];
+            $totalPages = 1;
             $dbError = $e->getMessage();
         }
 
@@ -81,7 +88,6 @@ public function index(Request $request, Response $response): Response
 
         ob_start();
         $viewPath = $this->basePath . '/resources/views/purchasing/rfq/index.php';
-        if ($dbError) echo "<div style='margin:20px; padding:20px; background:#fef2f2; color:#b91c1c; border-radius:8px;'><strong>DB Error:</strong> $dbError</div>";
         if (file_exists($viewPath)) include $viewPath;
         
         $content = ob_get_clean();
@@ -89,26 +95,20 @@ public function index(Request $request, Response $response): Response
         return $response->setContent(ob_get_clean())->setHeader('Content-Type', 'text/html');
     }
 
-      
-
     public function create(Request $request, Response $response): Response
     {
+        if (session_status() === PHP_SESSION_NONE) session_start();
+        $companyId = $_SESSION['company_id'] ?? 1;
+        $branchId  = $_SESSION['branch_id'] ?? 0;
+        $bCond     = $branchId > 0 ? " AND (branch_id = $branchId OR branch_id IS NULL OR branch_id = 0)" : "";
+
         $rfq = null; $items = []; $selectedSuppliers = []; $suppliers = []; $products = [];
         try {
-            $suppliers = $this->db->query("SELECT id, name_ar, name_en, code FROM suppliers WHERE is_active = 1 ORDER BY id DESC")->fetchAll(PDO::FETCH_OBJ);
-            $products = $this->db->query("SELECT id, item_code as code, COALESCE(name_ar, name_en) as name FROM products ORDER BY id DESC")->fetchAll(PDO::FETCH_OBJ);
-        } catch (Exception $e) {}
+            $suppliers = $this->db->query("SELECT id, COALESCE(name_ar, name_en) as name_ar, name_en, code FROM suppliers WHERE company_id = $companyId AND is_active = 1 $bCond ORDER BY id DESC")->fetchAll(PDO::FETCH_OBJ);
+            $products  = $this->db->query("SELECT id, item_code as code, COALESCE(name_ar, name_en) as name FROM products WHERE company_id = $companyId ORDER BY id DESC")->fetchAll(PDO::FETCH_OBJ);
+        } catch (Throwable $e) {}
 
-        ob_start(); 
-        $viewPath = $this->basePath . '/resources/views/purchasing/rfq/create.php';
-        
-        if (file_exists($viewPath)) {
-            include $viewPath;
-        } else {
-            echo "<div style='padding: 50px; text-align: center; color: #dc2626;'>ملف الواجهة غير موجود: <br><code>$viewPath</code></div>";
-        }
-        
-        $content = ob_get_clean();
+        ob_start(); include $this->basePath . '/resources/views/purchasing/rfq/create.php'; $content = ob_get_clean();
         ob_start(); include $this->basePath . '/resources/views/layouts/app.php';
         return $response->setContent(ob_get_clean())->setHeader('Content-Type', 'text/html');
     }
@@ -118,21 +118,34 @@ public function index(Request $request, Response $response): Response
         $data = $request->getParsedBody();
         if (session_status() === PHP_SESSION_NONE) session_start();
         $isAr = ($_SESSION['locale'] ?? 'ar') === 'ar';
+        $companyId = $_SESSION['company_id'] ?? 1;
+        $branchId  = $_SESSION['branch_id'] ?? 0;
 
         try {
             $this->db->beginTransaction();
 
-            $companyId = $_SESSION['company_id'] ?? 1;
             $rfqNum = !empty($data['rfq_number']) ? trim($data['rfq_number']) : 'RFQ-' . date('ymd') . '-' . rand(10, 99);
 
-            $stmt = $this->db->prepare("
-                INSERT INTO rfqs (company_id, rfq_number, title, request_date, deadline_date, status, notes)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            ");
-            $stmt->execute([
-                $companyId, $rfqNum, $data['title'], $data['request_date'], $data['deadline_date'],
-                $data['status'] ?? 'draft', $data['notes'] ?? null
-            ]);
+            try {
+                $stmt = $this->db->prepare("
+                    INSERT INTO rfqs (company_id, branch_id, rfq_number, title, request_date, deadline_date, status, notes)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ");
+                $stmt->execute([
+                    $companyId, $branchId, $rfqNum, $data['title'], $data['request_date'], $data['deadline_date'],
+                    $data['status'] ?? 'draft', $data['notes'] ?? null
+                ]);
+            } catch (\PDOException $ex) {
+                // احتياطي في حال عدم وجود عمود branch_id
+                $stmt = $this->db->prepare("
+                    INSERT INTO rfqs (company_id, rfq_number, title, request_date, deadline_date, status, notes)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                ");
+                $stmt->execute([
+                    $companyId, $rfqNum, $data['title'], $data['request_date'], $data['deadline_date'],
+                    $data['status'] ?? 'draft', $data['notes'] ?? null
+                ]);
+            }
             $rfqId = $this->db->lastInsertId();
 
             if (!empty($data['suppliers']) && is_array($data['suppliers'])) {
@@ -155,8 +168,8 @@ public function index(Request $request, Response $response): Response
 
             $this->db->commit();
             $_SESSION['flash_msg'] = $isAr ? "تم حفظ طلب عروض الأسعار بنجاح." : "RFQ saved successfully.";
-        } catch (Exception $e) {
-            $this->db->rollBack();
+        } catch (Throwable $e) {
+            if ($this->db->inTransaction()) $this->db->rollBack();
             $_SESSION['flash_err'] = "خطأ: " . $e->getMessage();
             return new RedirectResponse('/ERP/purchasing/rfq/create');
         }
@@ -166,9 +179,14 @@ public function index(Request $request, Response $response): Response
 
     public function edit(Request $request, Response $response, $id = null): Response
     {
+        if (session_status() === PHP_SESSION_NONE) session_start();
+        $companyId = $_SESSION['company_id'] ?? 1;
+        $branchId  = $_SESSION['branch_id'] ?? 0;
+        $bCond     = $branchId > 0 ? " AND (branch_id = $branchId OR branch_id IS NULL OR branch_id = 0)" : "";
+
         try {
-            $stmt = $this->db->prepare("SELECT * FROM rfqs WHERE id = ?");
-            $stmt->execute([$id]);
+            $stmt = $this->db->prepare("SELECT * FROM rfqs WHERE id = ? AND company_id = ?");
+            $stmt->execute([$id, $companyId]);
             $rfq = $stmt->fetch(PDO::FETCH_OBJ);
             if (!$rfq) throw new Exception("طلب التسعير غير موجود.");
 
@@ -180,19 +198,15 @@ public function index(Request $request, Response $response): Response
             $stmtSup->execute([$id]);
             $selectedSuppliers = $stmtSup->fetchAll(PDO::FETCH_COLUMN);
 
-            $suppliers = $this->db->query("SELECT id, name_ar, name_en, code FROM suppliers WHERE is_active = 1")->fetchAll(PDO::FETCH_OBJ);
-            $products = $this->db->query("SELECT id, item_code as code, COALESCE(name_ar, name_en) as name FROM products")->fetchAll(PDO::FETCH_OBJ);
+            $suppliers = $this->db->query("SELECT id, COALESCE(name_ar, name_en) as name_ar, name_en, code FROM suppliers WHERE company_id = $companyId AND is_active = 1 $bCond")->fetchAll(PDO::FETCH_OBJ);
+            $products  = $this->db->query("SELECT id, item_code as code, COALESCE(name_ar, name_en) as name FROM products WHERE company_id = $companyId")->fetchAll(PDO::FETCH_OBJ);
 
-        } catch (Exception $e) {
-            if (session_status() === PHP_SESSION_NONE) session_start();
+        } catch (Throwable $e) {
             $_SESSION['flash_err'] = $e->getMessage();
             return new RedirectResponse('/ERP/purchasing/rfq');
         }
 
-        ob_start(); 
-        $viewPath = $this->basePath . '/resources/views/purchasing/rfq/create.php';
-        if(file_exists($viewPath)) include $viewPath;
-        $content = ob_get_clean();
+        ob_start(); include $this->basePath . '/resources/views/purchasing/rfq/create.php'; $content = ob_get_clean();
         ob_start(); include $this->basePath . '/resources/views/layouts/app.php';
         return $response->setContent(ob_get_clean())->setHeader('Content-Type', 'text/html');
     }
@@ -202,12 +216,13 @@ public function index(Request $request, Response $response): Response
         $data = $request->getParsedBody();
         if (session_status() === PHP_SESSION_NONE) session_start();
         $isAr = ($_SESSION['locale'] ?? 'ar') === 'ar';
+        $companyId = $_SESSION['company_id'] ?? 1;
 
         try {
             $this->db->beginTransaction();
 
-            $stmt = $this->db->prepare("UPDATE rfqs SET title=?, request_date=?, deadline_date=?, status=?, notes=? WHERE id=?");
-            $stmt->execute([$data['title'], $data['request_date'], $data['deadline_date'], $data['status'] ?? 'draft', $data['notes'] ?? null, $id]);
+            $stmt = $this->db->prepare("UPDATE rfqs SET title=?, request_date=?, deadline_date=?, status=?, notes=? WHERE id=? AND company_id=?");
+            $stmt->execute([$data['title'], $data['request_date'], $data['deadline_date'], $data['status'] ?? 'draft', $data['notes'] ?? null, $id, $companyId]);
 
             $this->db->prepare("DELETE FROM rfq_suppliers WHERE rfq_id = ?")->execute([$id]);
             if (!empty($data['suppliers']) && is_array($data['suppliers'])) {
@@ -227,8 +242,8 @@ public function index(Request $request, Response $response): Response
 
             $this->db->commit();
             $_SESSION['flash_msg'] = $isAr ? "تم تحديث طلب التسعير بنجاح." : "RFQ updated successfully.";
-        } catch (Exception $e) {
-            $this->db->rollBack();
+        } catch (Throwable $e) {
+            if ($this->db->inTransaction()) $this->db->rollBack();
             $_SESSION['flash_err'] = "خطأ: " . $e->getMessage();
             return new RedirectResponse("/ERP/purchasing/rfq/{$id}/edit");
         }
@@ -238,9 +253,12 @@ public function index(Request $request, Response $response): Response
 
     public function show(Request $request, Response $response, $id = null): Response
     {
+        if (session_status() === PHP_SESSION_NONE) session_start();
+        $companyId = $_SESSION['company_id'] ?? 1;
+
         try {
-            $stmt = $this->db->prepare("SELECT * FROM rfqs WHERE id = ?");
-            $stmt->execute([$id]);
+            $stmt = $this->db->prepare("SELECT * FROM rfqs WHERE id = ? AND company_id = ?");
+            $stmt->execute([$id, $companyId]);
             $rfq = $stmt->fetch(PDO::FETCH_OBJ);
             if (!$rfq) throw new Exception("طلب التسعير غير موجود.");
 
@@ -252,17 +270,12 @@ public function index(Request $request, Response $response): Response
             $stmtSup->execute([$id]);
             $invitedSuppliers = $stmtSup->fetchAll(PDO::FETCH_OBJ);
 
-        } catch (Exception $e) {
-            if (session_status() === PHP_SESSION_NONE) session_start();
+        } catch (Throwable $e) {
             $_SESSION['flash_err'] = $e->getMessage();
             return new RedirectResponse('/ERP/purchasing/rfq');
         }
 
-        ob_start(); 
-        $viewPath = $this->basePath . '/resources/views/purchasing/rfq/show.php';
-        if(file_exists($viewPath)) include $viewPath;
-        $content = ob_get_clean();
-        
+        ob_start(); include $this->basePath . '/resources/views/purchasing/rfq/show.php'; $content = ob_get_clean();
         ob_start(); include $this->basePath . '/resources/views/layouts/app.php';
         return $response->setContent(ob_get_clean())->setHeader('Content-Type', 'text/html');
     }
@@ -270,10 +283,12 @@ public function index(Request $request, Response $response): Response
     public function delete(Request $request, Response $response, $id = null): Response
     {
         if (session_status() === PHP_SESSION_NONE) session_start();
+        $companyId = $_SESSION['company_id'] ?? 1;
+
         try {
-            $this->db->prepare("DELETE FROM rfqs WHERE id = ?")->execute([$id]);
+            $this->db->prepare("DELETE FROM rfqs WHERE id = ? AND company_id = ?")->execute([$id, $companyId]);
             $_SESSION['flash_msg'] = "تم حذف طلب التسعير بنجاح.";
-        } catch (Exception $e) {
+        } catch (Throwable $e) {
             $_SESSION['flash_err'] = "خطأ أثناء عملية الحذف.";
         }
         return new RedirectResponse('/ERP/purchasing/rfq');

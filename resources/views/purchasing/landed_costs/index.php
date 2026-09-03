@@ -3,6 +3,7 @@
 
 if (session_status() === PHP_SESSION_NONE) session_start();
 $isRtl = ($_SESSION['locale'] ?? 'ar') === 'ar';
+$currency = current_currency();
 
 $flashMsg = $_SESSION['flash_msg'] ?? null;
 $flashErr = $_SESSION['flash_err'] ?? null;
@@ -12,20 +13,30 @@ $t = [
     'ar' => [
         'title' => 'توزيع التكاليف الإضافية (Landed Costs)', 'desc' => 'توزيع مصاريف الشحن، الجمارك، والتأمين على تكلفة الشحنات المستوردة.',
         'add_btn' => 'تسجيل تكلفة إضافية', 'col_ref' => 'رقم القيد / أمر الشراء', 'col_sup' => 'المورد / طريقة التوزيع',
-        'col_date' => 'تاريخ القيد', 'col_total' => 'إجمالي المصاريف', 'col_status' => 'الحالة', 'col_actions' => 'إجراءات', 'empty' => 'لا توجد قيود تكاليف إضافية تطابق بحثك.'
+        'col_date' => 'تاريخ القيد', 'col_total' => 'إجمالي المصاريف', 'col_status' => 'الحالة', 'col_actions' => 'إجراءات', 'empty' => 'لا توجد قيود تكاليف إضافية تطابق بحثك.',
+        'search_placeholder' => 'ابحث برقم القيد، أمر الشراء المرتبط، أو المورد...', 'search_btn' => 'بحث', 'clear' => 'إلغاء',
+        'po_label' => 'أمر شراء:', 'general_vendor' => 'عام / متعدد', 'alloc_method' => 'التوزيع:',
+        'alloc_by_value' => 'حسب قيمة الأصناف', 'alloc_by_qty' => 'حسب كمية الأصناف', 'items_count' => 'البنود:',
+        'status_draft' => 'مسودة', 'status_allocated' => 'موزع مبدئياً', 'status_posted' => 'مرحل ومضاف للتكلفة',
+        'confirm_delete' => 'تأكيد الحذف؟'
     ],
     'en' => [
         'title' => 'Landed Costs Allocation', 'desc' => 'Allocate freight, customs, and insurance onto import shipment costs.',
         'add_btn' => 'Add Landed Cost', 'col_ref' => 'Ref No. / Purchase Order', 'col_sup' => 'Supplier / Allocation Method',
-        'col_date' => 'Cost Date', 'col_total' => 'Total Costs', 'col_status' => 'Status', 'col_actions' => 'Actions', 'empty' => 'No landed cost records found.'
+        'col_date' => 'Cost Date', 'col_total' => 'Total Costs', 'col_status' => 'Status', 'col_actions' => 'Actions', 'empty' => 'No landed cost records found.',
+        'search_placeholder' => 'Search by ref no, PO, or vendor...', 'search_btn' => 'Search', 'clear' => 'Clear',
+        'po_label' => 'PO:', 'general_vendor' => 'General / Multiple', 'alloc_method' => 'Allocation:',
+        'alloc_by_value' => 'By Value', 'alloc_by_qty' => 'By Quantity', 'items_count' => 'Items:',
+        'status_draft' => 'Draft', 'status_allocated' => 'Allocated', 'status_posted' => 'Posted',
+        'confirm_delete' => 'Confirm delete?'
     ]
 ][$isRtl ? 'ar' : 'en'];
 
-function getLcStatusBadge($status) {
+function getLcStatusBadge($status, $t) {
     $map = [
-        'draft' => ['bg' => '#f1f5f9', 'color' => '#64748b', 'label' => 'مسودة'],
-        'allocated' => ['bg' => '#e0e7ff', 'color' => '#4338ca', 'label' => 'موزع مبدئياً'],
-        'posted' => ['bg' => '#ecfdf5', 'color' => '#059669', 'label' => 'مرحل ومضاف للتكلفة']
+        'draft' => ['bg' => '#f1f5f9', 'color' => '#64748b', 'label' => $t['status_draft']],
+        'allocated' => ['bg' => '#e0e7ff', 'color' => '#4338ca', 'label' => $t['status_allocated']],
+        'posted' => ['bg' => '#ecfdf5', 'color' => '#059669', 'label' => $t['status_posted']]
     ];
     $s = $map[$status] ?? $map['draft'];
     return "<span style='background:{$s['bg']}; color:{$s['color']}; padding:4px 12px; border-radius:8px; font-weight:800; font-size:0.75rem; border:1px solid currentColor;'>{$s['label']}</span>";
@@ -70,7 +81,6 @@ function getLcStatusBadge($status) {
 
     .pagination { display: flex; justify-content: center; align-items: center; gap: 8px; margin-top: 24px; }
     .page-link { width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; border: 1px solid var(--c-border); background: #ffffff; color: var(--c-text-muted); text-decoration: none; font-weight: 800; transition: 0.2s; }
-    .page-link:hover { background: #f1f5f9; color: var(--c-text-dark); }
     .page-link.active { background: var(--c-indigo); color: #ffffff; border-color: var(--c-indigo); }
 </style>
 
@@ -89,68 +99,68 @@ function getLcStatusBadge($status) {
     <?php if($flashMsg): ?><div style="background: #ecfdf5; color: #059669; padding: 16px; border-radius: 12px; margin-bottom: 24px; font-weight: 700; border: 1px solid #a7f3d0;"><i class="ph-fill ph-check-circle"></i> <?= htmlspecialchars($flashMsg) ?></div><?php endif; ?>
     <?php if($flashErr): ?><div style="background: #fef2f2; color: #dc2626; padding: 16px; border-radius: 12px; margin-bottom: 24px; font-weight: 700; border: 1px solid #fecaca;"><i class="ph-fill ph-warning-circle"></i> <?= htmlspecialchars($flashErr) ?></div><?php endif; ?>
 
-    <!-- Search Form -->
     <form action="/ERP/purchasing/landed-costs" method="GET" class="search-bar">
-        <input type="text" name="search" class="search-input" placeholder="ابحث برقم القيد، أمر الشراء المرتبط، أو المورد..." value="<?= htmlspecialchars($search ?? '') ?>">
-        <button type="submit" class="btn-search"><i class="ph-bold ph-magnifying-glass"></i> بحث</button>
+        <input type="text" name="search" class="search-input" placeholder="<?= $t['search_placeholder'] ?>" value="<?= htmlspecialchars($search ?? '') ?>">
+        <button type="submit" class="btn-search"><i class="ph-bold ph-magnifying-glass"></i> <?= $t['search_btn'] ?></button>
         <?php if(!empty($search)): ?>
-            <a href="/ERP/purchasing/landed-costs" class="btn-clear"><i class="ph-bold ph-x"></i> إلغاء</a>
+            <a href="/ERP/purchasing/landed-costs" class="btn-clear"><i class="ph-bold ph-x"></i> <?= $t['clear'] ?></a>
         <?php endif; ?>
     </form>
 
     <div class="table-card">
-        <table class="mod-table">
-            <thead>
-                <tr>
-                    <th style="width: 25%;"><?= $t['col_ref'] ?></th>
-                    <th style="width: 25%;"><?= $t['col_sup'] ?></th>
-                    <th style="width: 15%;"><?= $t['col_date'] ?></th>
-                    <th style="width: 15%; text-align: end;"><?= $t['col_total'] ?></th>
-                    <th style="width: 10%; text-align: center;"><?= $t['col_status'] ?></th>
-                    <th style="width: 10%; text-align: center;"><?= $t['col_actions'] ?></th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php if (empty($landedCosts)): ?>
-                    <tr><td colspan="6" style="text-align: center; padding: 40px; color: #94a3b8; font-weight: 700;"><?= $t['empty'] ?></td></tr>
-                <?php else: foreach ($landedCosts as $lc): ?>
+        <div style="overflow-x: auto;">
+            <table class="mod-table">
+                <thead>
                     <tr>
-                        <td>
-                            <div style="font-weight: 900; color: var(--c-indigo); font-family: monospace; font-size: 1rem;"><i class="ph-bold ph-hash"></i> <?= htmlspecialchars($lc->reference_number) ?></div>
-                            <?php if(!empty($lc->po_number)): ?>
-                                <div style="color: var(--c-text-muted); font-size: 0.8rem; margin-top:2px;">أمر شراء: <span style="font-family:monospace; font-weight:bold; color:#0f172a;"><?= htmlspecialchars($lc->po_number) ?></span></div>
-                            <?php endif; ?>
-                        </td>
-                        <td>
-                            <div style="font-weight: 800; color: var(--c-text-dark);"><i class="ph-fill ph-buildings text-slate-400"></i> <?= htmlspecialchars($lc->supplier_name ?? 'عام / متعدد') ?></div>
-                            <div style="color: var(--c-text-muted); font-size: 0.8rem; margin-top:2px;">
-                                التوزيع: <strong><?= $lc->allocation_method == 'by_value' ? 'حسب قيمة الأصناف' : 'حسب كمية الأصناف' ?></strong>
-                            </div>
-                        </td>
-                        <td>
-                            <div style="font-weight: 700; color: #334155;"><i class="ph-bold ph-calendar-blank"></i> <?= $lc->cost_date ?></div>
-                            <div style="color: var(--c-text-muted); font-size: 0.8rem; margin-top:2px;">البنود: <?= $lc->items_count ?></div>
-                        </td>
-                        <td style="text-align: end; font-family: monospace; font-weight: 900; color: var(--c-indigo); font-size: 1.05rem;">
-                            <?= number_format($lc->total_amount, 2) ?>
-                        </td>
-                        <td style="text-align: center;">
-                            <?= getLcStatusBadge($lc->status) ?>
-                        </td>
-                        <td style="text-align: center; white-space: nowrap;">
-                            <a href="/ERP/purchasing/landed-costs/<?= $lc->id ?>" class="action-btn" title="معاينة وطباعة"><i class="ph-bold ph-printer"></i></a>
-                            <a href="/ERP/purchasing/landed-costs/<?= $lc->id ?>/edit" class="action-btn" title="تعديل"><i class="ph-bold ph-pencil-simple"></i></a>
-                            <form action="/ERP/purchasing/landed-costs/<?= $lc->id ?>/delete" method="POST" style="display:inline;" onsubmit="return confirm('تأكيد الحذف؟');">
-                                <button type="submit" class="action-btn delete" title="حذف"><i class="ph-bold ph-trash"></i></button>
-                            </form>
-                        </td>
+                        <th style="width: 25%;"><?= $t['col_ref'] ?></th>
+                        <th style="width: 25%;"><?= $t['col_sup'] ?></th>
+                        <th style="width: 15%;"><?= $t['col_date'] ?></th>
+                        <th style="width: 15%; text-align: end;"><?= $t['col_total'] ?></th>
+                        <th style="width: 10%; text-align: center;"><?= $t['col_status'] ?></th>
+                        <th style="width: 10%; text-align: center;"><?= $t['col_actions'] ?></th>
                     </tr>
-                <?php endforeach; endif; ?>
-            </tbody>
-        </table>
+                </thead>
+                <tbody>
+                    <?php if (empty($landedCosts)): ?>
+                        <tr><td colspan="6" style="text-align: center; padding: 40px; color: #94a3b8; font-weight: 700;"><?= $t['empty'] ?></td></tr>
+                    <?php else: foreach ($landedCosts as $lc): ?>
+                        <tr>
+                            <td>
+                                <div style="font-weight: 900; color: var(--c-indigo); font-family: monospace; font-size: 1rem;"><i class="ph-bold ph-hash"></i> <?= htmlspecialchars($lc->reference_number) ?></div>
+                                <?php if(!empty($lc->po_number)): ?>
+                                    <div style="color: var(--c-text-muted); font-size: 0.8rem; margin-top:2px;"><?= $t['po_label'] ?> <span style="font-family:monospace; font-weight:bold; color:#0f172a;"><?= htmlspecialchars($lc->po_number) ?></span></div>
+                                <?php endif; ?>
+                            </td>
+                            <td>
+                                <div style="font-weight: 800; color: var(--c-text-dark);"><i class="ph-fill ph-buildings text-slate-400"></i> <?= htmlspecialchars($lc->supplier_name ?? $t['general_vendor']) ?></div>
+                                <div style="color: var(--c-text-muted); font-size: 0.8rem; margin-top:2px;">
+                                    <?= $t['alloc_method'] ?> <strong><?= $lc->allocation_method == 'by_value' ? $t['alloc_by_value'] : $t['alloc_by_qty'] ?></strong>
+                                </div>
+                            </td>
+                            <td>
+                                <div style="font-weight: 700; color: #334155;"><i class="ph-bold ph-calendar-blank"></i> <?= $lc->cost_date ?></div>
+                                <div style="color: var(--c-text-muted); font-size: 0.8rem; margin-top:2px;"><?= $t['items_count'] ?> <?= $lc->items_count ?></div>
+                            </td>
+                            <td style="text-align: end; font-family: monospace; font-weight: 900; color: var(--c-indigo); font-size: 1.05rem;">
+                                <?= number_format($lc->total_amount, 2) ?> <?= $currency ?>
+                            </td>
+                            <td style="text-align: center;">
+                                <?= getLcStatusBadge($lc->status, $t) ?>
+                            </td>
+                            <td style="text-align: center; white-space: nowrap;">
+                                <a href="/ERP/purchasing/landed-costs/<?= $lc->id ?>" class="action-btn" title="معاينة وطباعة"><i class="ph-bold ph-printer"></i></a>
+                                <a href="/ERP/purchasing/landed-costs/<?= $lc->id ?>/edit" class="action-btn" title="تعديل"><i class="ph-bold ph-pencil-simple"></i></a>
+                                <form action="/ERP/purchasing/landed-costs/<?= $lc->id ?>/delete" method="POST" style="display:inline;" onsubmit="return confirm('<?= $t['confirm_delete'] ?>');">
+                                    <button type="submit" class="action-btn delete" title="حذف"><i class="ph-bold ph-trash"></i></button>
+                                </form>
+                            </td>
+                        </tr>
+                    <?php endforeach; endif; ?>
+                </tbody>
+            </table>
+        </div>
     </div>
 
-    <!-- Pagination -->
     <?php if (isset($totalPages) && $totalPages > 1): ?>
         <div class="pagination">
             <?php for($i = 1; $i <= $totalPages; $i++): ?>

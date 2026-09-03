@@ -3,6 +3,7 @@
 
 if (session_status() === PHP_SESSION_NONE) session_start();
 $isRtl = ($_SESSION['locale'] ?? 'ar') === 'ar';
+$currency = current_currency();
 
 $kpis = $kpis ?? [
     'total_projects' => 0, 'active_projects' => 0, 'total_contract_val' => 0,
@@ -10,11 +11,94 @@ $kpis = $kpis ?? [
 ];
 $charts = $charts ?? [
     'budget_proj_names' => [], 'budget_values' => [], 'spent_values' => [],
-    'status_labels' => ['التخطيط', 'قيد التنفيذ', 'متوقف', 'مكتمل', 'ملغى'], 'status_counts' => [0,0,0,0,0],
+    'status_keys' => [], 'status_counts' => [],
     'monthly_labels' => [], 'monthly_claims' => [], 'monthly_costs' => [],
-    'cost_cat_labels' => ['مواد', 'عمالة', 'معدات', 'مقاولين', 'إدارية'], 'cost_cat_values' => [0,0,0,0,0]
+    'cost_cat_keys' => [], 'cost_cat_values' => []
 ];
 $recentProjects = $recentProjects ?? [];
+$dbErrors = $dbErrors ?? [];
+
+$t = [
+    'ar' => [
+        'title' => 'لوحة قيادة المشاريع والمقاولات',
+        'desc' => 'متابعة شاملة للميزانيات، المستخلصات، مصروفات المواقع، والعقود.',
+        'export' => 'تصدير شيت إكسيل',
+        'print' => 'طباعة التقرير',
+        'kpi_active' => 'المشاريع النشطة',
+        'kpi_contracts' => 'إجمالي قيمة العقود',
+        'kpi_spent' => 'المصروفات الفعلية',
+        'kpi_claims' => 'مطالبات المستخلصات',
+        'kpi_paid' => 'المحصلات والتحصيلات',
+        'kpi_milestones' => 'مهام جارية التنفيذ',
+        'chart1_title' => '1. مقارنة الميزانية التقديرية بالمصروفات الفعلية',
+        'chart2_title' => '2. توزيع المشاريع حسب الحالة',
+        'chart3_title' => '3. حركة المستخلصات مقابل المصروفات (آخر 6 أشهر)',
+        'chart4_title' => '4. توزيع التكاليف حسب تبويب المصروف',
+        'hub_title' => 'اختصارات أقسام المشاريع',
+        'hub_dir' => 'سجل المشاريع',
+        'hub_ms' => 'المراحل والمهام',
+        'hub_inv' => 'المستخلصات',
+        'hub_cost' => 'مصروفات الموقع',
+        'hub_cont' => 'عقود المشاريع',
+        'table_title' => 'أحدث المشاريع المسجلة ونسبة الإنجاز',
+        'col_code' => 'الكود',
+        'col_name' => 'اسم المشروع',
+        'col_val' => 'قيمة العقد',
+        'col_prog' => 'نسبة الإنجاز',
+        'col_status' => 'الحالة',
+        'empty' => 'لا توجد مشاريع مسجلة مؤخراً.',
+        // Chart Labels
+        'lbl_budget' => 'الميزانية', 'lbl_spent' => 'المنصرف',
+        'lbl_claims' => 'المستخلصات', 'lbl_costs' => 'المصروفات',
+        'cat_materials' => 'مواد وتوريدات', 'cat_labor' => 'عمالة وأجور', 'cat_equipment' => 'معدات وآليات', 'cat_subcontractor' => 'مقاولين فرعيين', 'cat_overhead' => 'مصروفات إدارية',
+        'st_planning' => 'التخطيط', 'st_in_progress' => 'قيد التنفيذ', 'st_on_hold' => 'متوقف', 'st_completed' => 'مكتمل', 'st_cancelled' => 'ملغى'
+    ],
+    'en' => [
+        'title' => 'Projects & Contracting Dashboard',
+        'desc' => 'Executive overview of budgets, claims, site costs, and contracts.',
+        'export' => 'Export Excel',
+        'print' => 'Print Report',
+        'kpi_active' => 'Active Projects',
+        'kpi_contracts' => 'Total Contracts Value',
+        'kpi_spent' => 'Actual Spent Costs',
+        'kpi_claims' => 'Total Claims (Invoices)',
+        'kpi_paid' => 'Paid / Collected Claims',
+        'kpi_milestones' => 'Active Milestones',
+        'chart1_title' => '1. Estimated Budget vs Actual Spent',
+        'chart2_title' => '2. Projects Status Distribution',
+        'chart3_title' => '3. Claims vs Costs Trend (Last 6 Months)',
+        'chart4_title' => '4. Costs Distribution by Category',
+        'hub_title' => 'Projects Quick Hub',
+        'hub_dir' => 'Projects Directory',
+        'hub_ms' => 'Milestones',
+        'hub_inv' => 'Progress Claims',
+        'hub_cost' => 'Site Expenses',
+        'hub_cont' => 'Contracts Directory',
+        'table_title' => 'Recent Projects & Progress',
+        'col_code' => 'Code',
+        'col_name' => 'Project Name',
+        'col_val' => 'Contract Value',
+        'col_prog' => 'Progress %',
+        'col_status' => 'Status',
+        'empty' => 'No recent projects found.',
+        // Chart Labels
+        'lbl_budget' => 'Budget', 'lbl_spent' => 'Spent',
+        'lbl_claims' => 'Claims', 'lbl_costs' => 'Costs',
+        'cat_materials' => 'Materials', 'cat_labor' => 'Labor', 'cat_equipment' => 'Equipment', 'cat_subcontractor' => 'Subcontractors', 'cat_overhead' => 'Overhead',
+        'st_planning' => 'Planning', 'st_in_progress' => 'In Progress', 'st_on_hold' => 'On Hold', 'st_completed' => 'Completed', 'st_cancelled' => 'Cancelled'
+    ]
+][$isRtl ? 'ar' : 'en'];
+
+$chartStatusLabels = array_map(fn($k) => $t['st_'.$k] ?? $k, $charts['status_keys']);
+$chartCatLabels = array_map(fn($k) => $t['cat_'.$k] ?? $k, $charts['cost_cat_keys']);
+
+$statusMap = [
+    'planning' => ['color' => '#6366f1', 'bg' => '#e0e7ff'],
+    'in_progress' => ['color' => '#0284c7', 'bg' => '#e0f2fe'],
+    'on_hold' => ['color' => '#d97706', 'bg' => '#fef3c7'],
+    'completed' => ['color' => '#059669', 'bg' => '#ecfdf5'],
+    'cancelled' => ['color' => '#dc2626', 'bg' => '#fef2f2'],
+];
 ?>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -34,10 +118,11 @@ $recentProjects = $recentProjects ?? [];
     .dash-title-group { display: flex; align-items: center; gap: 14px; }
     .dash-header-icon { width: 52px; height: 52px; background: var(--dash-indigo-bg); color: var(--dash-indigo); border-radius: 16px; display: flex; align-items: center; justify-content: center; font-size: 1.8rem; box-shadow: 0 6px 15px rgba(79, 70, 229, 0.15); }
 
-    .btn-export-excel { background: #059669; color: #ffffff !important; padding: 10px 20px; border-radius: 12px; font-weight: 800; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; box-shadow: 0 4px 12px rgba(5, 150, 105, 0.2); transition: all 0.2s ease; }
+    .btn-export-excel { background: #059669; color: #ffffff !important; padding: 10px 20px; border-radius: 12px; font-weight: 800; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; box-shadow: 0 4px 12px rgba(5, 150, 105, 0.2); transition: 0.2s; border: none; cursor:pointer;}
     .btn-export-excel:hover { background: #047857; transform: translateY(-2px); }
+    .btn-print { background: #0f172a; color: #ffffff !important; padding: 10px 20px; border-radius: 12px; font-weight: 800; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; transition: 0.2s; border: none; cursor:pointer;}
+    .btn-print:hover { background: #1e293b; transform: translateY(-2px); }
 
-    /* Bento Grid System */
     .bento-grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 20px; margin-bottom: 24px; }
     
     .bento-card {
@@ -72,6 +157,14 @@ $recentProjects = $recentProjects ?? [];
     .dash-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
     .dash-table th { padding: 12px 14px; background: #f8fafc; color: #64748b; font-weight: 800; border-bottom: 2px solid #e2e8f0; text-align: start; }
     .dash-table td { padding: 12px 14px; border-bottom: 1px solid #f1f5f9; color: #334155; vertical-align: middle; }
+
+    @media print {
+        .nt-sidebar, header, nav, .dash-header .btn-export-excel, .dash-header .btn-print, .hub-grid, .kpi-link { display: none !important; }
+        body { background: #fff !important; }
+        .projects-dash { max-width: 100% !important; padding:0 !important;}
+        .bento-card { border: 1px solid #000 !important; box-shadow: none !important; break-inside: avoid; }
+        * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+    }
 </style>
 
 <div class="projects-dash" dir="<?= $isRtl ? 'rtl' : 'ltr' ?>">
@@ -80,54 +173,61 @@ $recentProjects = $recentProjects ?? [];
         <div class="dash-title-group">
             <div class="dash-header-icon"><i class="ph-duotone ph-kanban"></i></div>
             <div>
-                <h2 style="margin:0; font-size:1.8rem; font-weight:900; color:#0f172a;"><?= $isRtl ? 'لوحة قيادة المشاريع والمقاولات' : 'Projects Dashboard' ?></h2>
-                <p style="margin:3px 0 0 0; color:#64748b; font-size:0.9rem; font-weight:600;"><?= $isRtl ? 'متابعة شاملة للميزانيات والمستخلصات، مصروفات الموقع، والعقود.' : 'Executive overview of project budgets, claims, site costs, and contracts.' ?></p>
+                <h2 style="margin:0; font-size:1.8rem; font-weight:900; color:#0f172a;"><?= $t['title'] ?></h2>
+                <p style="margin:3px 0 0 0; color:#64748b; font-size:0.9rem; font-weight:600;"><?= $t['desc'] ?></p>
             </div>
         </div>
-        <div>
-            <a href="/ERP/projects/dashboard?export=excel" class="btn-export-excel">
-                <i class="ph-bold ph-file-xls" style="font-size:1.2rem;"></i>
-                <?= $isRtl ? 'تصدير شيت إكسيل' : 'Export Excel' ?>
-            </a>
+        <div style="display:flex; gap:10px;">
+            <button onclick="window.print()" class="btn-print"><i class="ph-bold ph-printer"></i> <?= $t['print'] ?></button>
+            <a href="/ERP/projects/dashboard?export=excel" class="btn-export-excel"><i class="ph-bold ph-file-xls"></i> <?= $t['export'] ?></a>
         </div>
     </div>
+
+    <!-- صندوق عرض أخطاء قواعد البيانات (للمساعدة في التتبع لو حصلت مشكلة) -->
+    <?php if (!empty($dbErrors)): ?>
+        <div style="background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; padding: 16px; border-radius: 12px; margin-bottom: 24px; font-weight: bold; font-family: monospace;">
+            <i class="ph-bold ph-warning-circle"></i> تنبيه: بعض البيانات غير مكتملة في قاعدة البيانات!<br>
+            <?php foreach($dbErrors as $err): ?>
+                <div style="font-size: 0.8rem; margin-top: 4px;">- <?= htmlspecialchars($err) ?></div>
+            <?php endforeach; ?>
+        </div>
+    <?php endif; ?>
 
     <!-- 6 Clickable Executive KPIs -->
     <div class="bento-grid">
         <a href="/ERP/projects/list" class="bento-card kpi-card kpi-link">
             <div class="kpi-icon" style="background: var(--dash-cyan-bg); color: var(--dash-cyan);"><i class="ph-duotone ph-buildings"></i></div>
-            <div class="kpi-label"><?= $isRtl ? 'المشاريع النشطة' : 'Active Projects' ?></div>
+            <div class="kpi-label"><?= $t['kpi_active'] ?></div>
             <div class="kpi-value" style="color: var(--dash-cyan);"><?= number_format($kpis['active_projects']) ?> <span style="font-size:0.8rem; color:#64748b;">/ <?= $kpis['total_projects'] ?></span></div>
         </a>
 
-        <!-- تصحيح الأيقونة إلى ph-scroll المعتمدة وتوسيطها -->
         <a href="/ERP/projects/contracts" class="bento-card kpi-card kpi-link" title="اضغط للذهاب لصفحة العقود">
             <div class="kpi-icon" style="background: var(--dash-rose-bg); color: var(--dash-rose);"><i class="ph-duotone ph-scroll"></i></div>
-            <div class="kpi-label"><?= $isRtl ? 'إجمالي قيمة العقود' : 'Total Contracts' ?></div>
-            <div class="kpi-value" style="color: var(--dash-rose);"><?= number_format($kpis['total_contract_val'], 2) ?></div>
+            <div class="kpi-label"><?= $t['kpi_contracts'] ?></div>
+            <div class="kpi-value" style="color: var(--dash-rose);"><?= number_format($kpis['total_contract_val'], 2) ?> <span style="font-size:0.7rem; color:#64748b;"><?= $currency ?></span></div>
         </a>
 
         <a href="/ERP/projects/costs" class="bento-card kpi-card kpi-link">
             <div class="kpi-icon" style="background: var(--dash-orange-bg); color: var(--dash-orange);"><i class="ph-duotone ph-currency-dollar"></i></div>
-            <div class="kpi-label"><?= $isRtl ? 'المصروفات الفعلية' : 'Total Spent' ?></div>
-            <div class="kpi-value" style="color: var(--dash-orange);"><?= number_format($kpis['total_spent'], 2) ?></div>
+            <div class="kpi-label"><?= $t['kpi_spent'] ?></div>
+            <div class="kpi-value" style="color: var(--dash-orange);"><?= number_format($kpis['total_spent'], 2) ?> <span style="font-size:0.7rem; color:#64748b;"><?= $currency ?></span></div>
         </a>
 
         <a href="/ERP/projects/invoices" class="bento-card kpi-card kpi-link">
             <div class="kpi-icon" style="background: var(--dash-emerald-bg); color: var(--dash-emerald);"><i class="ph-duotone ph-file-text"></i></div>
-            <div class="kpi-label"><?= $isRtl ? 'مطالبات المستخلصات' : 'Total Claims' ?></div>
-            <div class="kpi-value" style="color: var(--dash-emerald);"><?= number_format($kpis['total_claims'], 2) ?></div>
+            <div class="kpi-label"><?= $t['kpi_claims'] ?></div>
+            <div class="kpi-value" style="color: var(--dash-emerald);"><?= number_format($kpis['total_claims'], 2) ?> <span style="font-size:0.7rem; color:#64748b;"><?= $currency ?></span></div>
         </a>
 
         <a href="/ERP/projects/invoices?status=paid" class="bento-card kpi-card kpi-link">
             <div class="kpi-icon" style="background: var(--dash-indigo-bg); color: var(--dash-indigo);"><i class="ph-duotone ph-check-circle"></i></div>
-            <div class="kpi-label"><?= $isRtl ? 'المحصلات والتحصيلات' : 'Paid Claims' ?></div>
-            <div class="kpi-value" style="color: var(--dash-indigo);"><?= number_format($kpis['total_paid_claims'], 2) ?></div>
+            <div class="kpi-label"><?= $t['kpi_paid'] ?></div>
+            <div class="kpi-value" style="color: var(--dash-indigo);"><?= number_format($kpis['total_paid_claims'], 2) ?> <span style="font-size:0.7rem; color:#64748b;"><?= $currency ?></span></div>
         </a>
 
         <a href="/ERP/projects/milestones" class="bento-card kpi-card kpi-link">
             <div class="kpi-icon" style="background: var(--dash-violet-bg); color: var(--dash-violet);"><i class="ph-duotone ph-flag-banner"></i></div>
-            <div class="kpi-label"><?= $isRtl ? 'مهام جارية التنفيذ' : 'Active Milestones' ?></div>
+            <div class="kpi-label"><?= $t['kpi_milestones'] ?></div>
             <div class="kpi-value" style="color: var(--dash-violet);"><?= number_format($kpis['active_milestones']) ?></div>
         </a>
     </div>
@@ -137,7 +237,7 @@ $recentProjects = $recentProjects ?? [];
         <div class="bento-card col-8">
             <h3 style="margin:0 0 18px 0; font-size:1.1rem; font-weight:800; color:#0f172a; display:flex; align-items:center; gap:8px;">
                 <i class="ph-duotone ph-chart-bar" style="color:var(--dash-indigo); font-size:1.3rem;"></i>
-                <?= $isRtl ? '1. مقارنة الميزانية التقديرية بالمصروفات الفعلية' : '1. Budget vs Spent' ?>
+                <?= $t['chart1_title'] ?>
             </h3>
             <div style="height: 250px; position: relative; width: 100%;">
                 <canvas id="budgetVsSpentChart"></canvas>
@@ -147,7 +247,7 @@ $recentProjects = $recentProjects ?? [];
         <div class="bento-card col-4">
             <h3 style="margin:0 0 18px 0; font-size:1.1rem; font-weight:800; color:#0f172a; display:flex; align-items:center; gap:8px;">
                 <i class="ph-duotone ph-chart-pie-slice" style="color:var(--dash-cyan); font-size:1.3rem;"></i>
-                <?= $isRtl ? '2. توزيع المشاريع حسب الحالة' : '2. Project Status' ?>
+                <?= $t['chart2_title'] ?>
             </h3>
             <div style="height: 220px; position: relative; width: 100%; display:flex; justify-content:center;">
                 <canvas id="statusPieChart"></canvas>
@@ -160,7 +260,7 @@ $recentProjects = $recentProjects ?? [];
         <div class="bento-card col-8">
             <h3 style="margin:0 0 18px 0; font-size:1.1rem; font-weight:800; color:#0f172a; display:flex; align-items:center; gap:8px;">
                 <i class="ph-duotone ph-chart-line-up" style="color:var(--dash-emerald); font-size:1.3rem;"></i>
-                <?= $isRtl ? '3. حركة المستخلصات مقابل مصروفات المواقع (آخر 6 أشهر)' : '3. Claims vs Costs Trend' ?>
+                <?= $t['chart3_title'] ?>
             </h3>
             <div style="height: 240px; position: relative; width: 100%;">
                 <canvas id="monthlyClaimsCostsChart"></canvas>
@@ -170,7 +270,7 @@ $recentProjects = $recentProjects ?? [];
         <div class="bento-card col-4">
             <h3 style="margin:0 0 18px 0; font-size:1.1rem; font-weight:800; color:#0f172a; display:flex; align-items:center; gap:8px;">
                 <i class="ph-duotone ph-coins" style="color:var(--dash-orange); font-size:1.3rem;"></i>
-                <?= $isRtl ? '4. توزيع التكاليف حسب تبويب المصروف' : '4. Cost Categories' ?>
+                <?= $t['chart4_title'] ?>
             </h3>
             <div style="height: 240px; position: relative; width: 100%;">
                 <canvas id="costCategoriesChart"></canvas>
@@ -183,34 +283,33 @@ $recentProjects = $recentProjects ?? [];
         <div class="bento-card col-4" style="background:#f8fafc;">
             <h3 style="margin:0 0 16px 0; font-size:1.1rem; font-weight:800; color:#0f172a; display:flex; align-items:center; gap:8px;">
                 <i class="ph-fill ph-grid-four" style="color:#64748b;"></i>
-                <?= $isRtl ? 'اختصارات أقسام المشاريع' : 'Quick Projects Hub' ?>
+                <?= $t['hub_title'] ?>
             </h3>
 
             <div class="hub-grid">
                 <a href="/ERP/projects/list" class="action-card-node">
                     <i class="ph-duotone ph-buildings" style="background:var(--dash-cyan-bg); color:var(--dash-cyan);"></i>
-                    <span><?= $isRtl ? 'سجل المشاريع' : 'Projects Directory' ?></span>
+                    <span><?= $t['hub_dir'] ?></span>
                 </a>
 
                 <a href="/ERP/projects/milestones" class="action-card-node">
                     <i class="ph-duotone ph-flag-banner" style="background:var(--dash-violet-bg); color:var(--dash-violet);"></i>
-                    <span><?= $isRtl ? 'المراحل والمهام' : 'Milestones' ?></span>
+                    <span><?= $t['hub_ms'] ?></span>
                 </a>
 
                 <a href="/ERP/projects/invoices" class="action-card-node">
                     <i class="ph-duotone ph-file-text" style="background:var(--dash-emerald-bg); color:var(--dash-emerald);"></i>
-                    <span><?= $isRtl ? 'المستخلصات' : 'Claims' ?></span>
+                    <span><?= $t['hub_inv'] ?></span>
                 </a>
 
                 <a href="/ERP/projects/costs" class="action-card-node">
                     <i class="ph-duotone ph-currency-dollar" style="background:var(--dash-orange-bg); color:var(--dash-orange);"></i>
-                    <span><?= $isRtl ? 'مصروفات الموقع' : 'Site Expenses' ?></span>
+                    <span><?= $t['hub_cost'] ?></span>
                 </a>
 
-                <!-- تصحيح أيقونة الاختصار أيضاً -->
                 <a href="/ERP/projects/contracts" class="action-card-node" style="grid-column: span 2;">
                     <i class="ph-duotone ph-scroll" style="background:var(--dash-rose-bg); color:var(--dash-rose);"></i>
-                    <span><?= $isRtl ? 'عقود المشاريع والمقاولين' : 'Contracts Directory' ?></span>
+                    <span><?= $t['hub_cont'] ?></span>
                 </a>
             </div>
         </div>
@@ -218,27 +317,32 @@ $recentProjects = $recentProjects ?? [];
         <div class="bento-card col-8">
             <h3 style="margin:0 0 16px 0; font-size:1.1rem; font-weight:800; color:#0f172a; display:flex; align-items:center; gap:8px;">
                 <i class="ph-duotone ph-list-bullets" style="color:var(--dash-indigo); font-size:1.3rem;"></i>
-                <?= $isRtl ? 'أحدث المشاريع المسجلة ونسبة الإنجاز' : 'Recent Projects' ?>
+                <?= $t['table_title'] ?>
             </h3>
 
             <table class="dash-table">
                 <thead>
                     <tr>
-                        <th><?= $isRtl ? 'الكود' : 'Code' ?></th>
-                        <th><?= $isRtl ? 'اسم المشروع' : 'Project Name' ?></th>
-                        <th><?= $isRtl ? 'قيمة العقد' : 'Contract Value' ?></th>
-                        <th style="width:25%;"><?= $isRtl ? 'نسبة الإنجاز' : 'Completion %' ?></th>
-                        <th style="text-align:center;"><?= $isRtl ? 'الحالة' : 'Status' ?></th>
+                        <th><?= $t['col_code'] ?></th>
+                        <th><?= $t['col_name'] ?></th>
+                        <th><?= $t['col_val'] ?></th>
+                        <th style="width:25%;"><?= $t['col_prog'] ?></th>
+                        <th style="text-align:center;"><?= $t['col_status'] ?></th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php if (empty($recentProjects)): ?>
-                        <tr><td colspan="5" style="text-align:center; padding:30px; color:#94a3b8; font-weight:700;"><?= $isRtl ? 'لا توجد مشاريع مسجلة مؤخراً.' : 'No recent projects found.' ?></td></tr>
-                    <?php else: foreach ($recentProjects as $p): $pct = (float)$p->progress_percent; ?>
+                        <tr><td colspan="5" style="text-align:center; padding:30px; color:#94a3b8; font-weight:700;"><?= $t['empty'] ?></td></tr>
+                    <?php else: foreach ($recentProjects as $p): 
+                        $pct = (float)$p->progress_percent; 
+                        $pName = $isRtl ? ($p->name_ar ?: $p->name_en) : ($p->name_en ?: $p->name_ar);
+                        $stMap = $statusMap[$p->status] ?? $statusMap['planning'];
+                        $stLabel = $t['st_'.$p->status] ?? $p->status;
+                    ?>
                         <tr>
                             <td style="font-family:monospace; font-weight:900; color:var(--dash-indigo);"><?= htmlspecialchars($p->code) ?></td>
-                            <td style="font-weight:800; color:#0f172a;"><?= htmlspecialchars($p->name_ar) ?></td>
-                            <td style="font-family:monospace; font-weight:800; color:#334155;"><?= number_format((float)$p->contract_value, 2) ?></td>
+                            <td style="font-weight:800; color:#0f172a;"><?= htmlspecialchars($pName) ?></td>
+                            <td style="font-family:monospace; font-weight:800; color:#334155;"><?= number_format((float)$p->contract_value, 2) ?> <?= $currency ?></td>
                             <td>
                                 <div style="display:flex; justify-content:space-between; font-size:0.75rem; font-family:monospace; font-weight:bold; margin-bottom:2px;">
                                     <span><?= $pct ?>%</span>
@@ -248,8 +352,8 @@ $recentProjects = $recentProjects ?? [];
                                 </div>
                             </td>
                             <td style="text-align:center;">
-                                <span style="font-size:0.75rem; font-weight:800; padding:2px 8px; border-radius:6px; background:#e0f2fe; color:#0284c7;">
-                                    <?= htmlspecialchars($p->status) ?>
+                                <span style="font-size:0.75rem; font-weight:800; padding:4px 10px; border-radius:6px; background:<?= $stMap['bg'] ?>; color:<?= $stMap['color'] ?>;">
+                                    <?= htmlspecialchars($stLabel) ?>
                                 </span>
                             </td>
                         </tr>
@@ -264,44 +368,48 @@ $recentProjects = $recentProjects ?? [];
 document.addEventListener("DOMContentLoaded", function() {
     Chart.defaults.font.family = "'Cairo', 'Inter', sans-serif";
 
+    // 1. Budget vs Spent
     new Chart(document.getElementById('budgetVsSpentChart').getContext('2d'), {
         type: 'bar',
         data: {
             labels: <?= json_encode($charts['budget_proj_names']) ?>,
             datasets: [
-                { label: '<?= $isRtl ? "الميزانية" : "Budget" ?>', data: <?= json_encode($charts['budget_values']) ?>, backgroundColor: '#4f46e5', borderRadius: 6 },
-                { label: '<?= $isRtl ? "المنصرف" : "Spent" ?>', data: <?= json_encode($charts['spent_values']) ?>, backgroundColor: '#ea580c', borderRadius: 6 }
+                { label: '<?= $t['lbl_budget'] ?>', data: <?= json_encode($charts['budget_values']) ?>, backgroundColor: '#4f46e5', borderRadius: 6 },
+                { label: '<?= $t['lbl_spent'] ?>', data: <?= json_encode($charts['spent_values']) ?>, backgroundColor: '#ea580c', borderRadius: 6 }
             ]
         },
         options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top' } } }
     });
 
+    // 2. Status Pie
     new Chart(document.getElementById('statusPieChart').getContext('2d'), {
         type: 'doughnut',
         data: {
-            labels: <?= json_encode($charts['status_labels']) ?>,
-            datasets: [{ data: <?= json_encode($charts['status_counts']) ?>, backgroundColor: ['#0284c7', '#4f46e5', '#d97706', '#059669', '#dc2626'], borderWidth: 2 }]
+            labels: <?= json_encode($chartStatusLabels) ?>,
+            datasets: [{ data: <?= json_encode($charts['status_counts']) ?>, backgroundColor: ['#6366f1', '#0284c7', '#d97706', '#059669', '#dc2626'], borderWidth: 2 }]
         },
         options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
     });
 
+    // 3. Claims vs Costs Line
     new Chart(document.getElementById('monthlyClaimsCostsChart').getContext('2d'), {
         type: 'line',
         data: {
             labels: <?= json_encode($charts['monthly_labels']) ?>,
             datasets: [
-                { label: '<?= $isRtl ? "المستخلصات" : "Claims" ?>', data: <?= json_encode($charts['monthly_claims']) ?>, borderColor: '#059669', backgroundColor: 'rgba(5, 150, 105, 0.08)', borderWidth: 3, fill: true, tension: 0.4 },
-                { label: '<?= $isRtl ? "المصروفات" : "Costs" ?>', data: <?= json_encode($charts['monthly_costs']) ?>, borderColor: '#ea580c', backgroundColor: 'rgba(234, 88, 12, 0.08)', borderWidth: 3, fill: true, tension: 0.4 }
+                { label: '<?= $t['lbl_claims'] ?>', data: <?= json_encode($charts['monthly_claims']) ?>, borderColor: '#059669', backgroundColor: 'rgba(5, 150, 105, 0.08)', borderWidth: 3, fill: true, tension: 0.4 },
+                { label: '<?= $t['lbl_costs'] ?>', data: <?= json_encode($charts['monthly_costs']) ?>, borderColor: '#ea580c', backgroundColor: 'rgba(234, 88, 12, 0.08)', borderWidth: 3, fill: true, tension: 0.4 }
             ]
         },
         options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top' } } }
     });
 
+    // 4. Cost Categories Bar
     new Chart(document.getElementById('costCategoriesChart').getContext('2d'), {
         type: 'bar',
         data: {
-            labels: <?= json_encode($charts['cost_cat_labels']) ?>,
-            datasets: [{ label: '<?= $isRtl ? "إجمالي" : "Total" ?>', data: <?= json_encode($charts['cost_cat_values']) ?>, backgroundColor: ['#2563eb', '#8b5cf6', '#d97706', '#ea580c', '#0284c7'], borderRadius: 8 }]
+            labels: <?= json_encode($chartCatLabels) ?>,
+            datasets: [{ label: 'Total', data: <?= json_encode($charts['cost_cat_values']) ?>, backgroundColor: ['#059669', '#2563eb', '#d97706', '#8b5cf6', '#0284c7'], borderRadius: 8 }]
         },
         options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
     });

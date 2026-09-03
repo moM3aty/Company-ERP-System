@@ -18,15 +18,32 @@ class Response {
         return $this;
     }
 
-    public function send(): void {
-        // إجبار المتصفح على قراءة المخرج كـ HTML
-        header('Content-Type: text/html; charset=UTF-8');
-        http_response_code($this->statusCode);
+    // دالة الحصول على كود الحالة لمنع أخطاء index.php
+    public function getStatusCode(): int {
+        return $this->statusCode;
+    }
 
-        foreach ($this->headers as $name => $value) {
-            header("{$name}: {$value}");
+    public function setStatusCode(int $code): self {
+        $this->statusCode = $code;
+        return $this;
+    }
+
+    public function send(): void {
+        // التحقق من أن الهيدر لم يتم إرساله مسبقاً لمنع الأخطاء
+        if (!headers_sent()) {
+            // إزالة أي Content-Type خاطئ مفروض من النظام
+            header_remove('Content-Type');
+            
+            // إجبار المتصفح على قراءة المحتوى كصفحة ويب (HTML)
+            header('Content-Type: text/html; charset=UTF-8', true);
+            http_response_code($this->statusCode);
+
+            foreach ($this->headers as $name => $value) {
+                header("{$name}: {$value}", true);
+            }
         }
 
+        // طباعة الصفحة النهائية
         echo $this->content;
         exit;
     }
