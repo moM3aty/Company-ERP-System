@@ -8,32 +8,38 @@ $flashMsg = $_SESSION['flash_msg'] ?? null;
 $flashErr = $_SESSION['flash_err'] ?? null;
 unset($_SESSION['flash_msg'], $_SESSION['flash_err']);
 
+$activeBranchName = $_SESSION['active_branch_name'] ?? ($isRtl ? 'كل الفروع' : 'All Branches');
+
 $t = [
     'ar' => [
         'title' => 'المستودعات والمخازن', 'desc' => 'إدارة الفروع المخزنية، أماكن حفظ البضائع ومسؤولي العهد.',
         'add_btn' => 'إضافة مستودع', 'col_name' => 'رمز واسم المستودع', 'col_contact' => 'الموقع والمسؤول',
-        'col_status' => 'الحالة', 'col_actions' => 'إجراءات', 'empty' => 'لا توجد مستودعات تطابق بحثك.'
+        'col_status' => 'الحالة', 'col_actions' => 'إجراءات', 'empty' => 'لا توجد مستودعات تطابق بحثك.',
+        'search_ph' => 'ابحث بكود المستودع، الاسم، الموقع، أو المسؤول...', 'btn_search' => 'بحث', 'btn_clear' => 'إلغاء',
+        'kpi_total' => 'إجمالي المستودعات', 'kpi_active' => 'مستودعات نشطة', 'kpi_inactive' => 'مستودعات متوقفة',
+        'active_scope' => 'الفرع النشط:', 'status_active' => 'نشط', 'status_inactive' => 'موقوف',
+        'no_location' => 'الموقع غير محدد', 'no_manager' => 'بدون أمين مخزن', 'confirm_delete' => 'تأكيد حذف المستودع؟'
     ],
     'en' => [
         'title' => 'Warehouses & Locations', 'desc' => 'Manage inventory locations, branches, and storekeepers.',
         'add_btn' => 'New Warehouse', 'col_name' => 'Code & Name', 'col_contact' => 'Location & Manager',
-        'col_status' => 'Status', 'col_actions' => 'Actions', 'empty' => 'No warehouses found.'
+        'col_status' => 'Status', 'col_actions' => 'Actions', 'empty' => 'No warehouses found.',
+        'search_ph' => 'Search by code, name, location or manager...', 'btn_search' => 'Search', 'btn_clear' => 'Clear',
+        'kpi_total' => 'Total Warehouses', 'kpi_active' => 'Active Warehouses', 'kpi_inactive' => 'Inactive Warehouses',
+        'active_scope' => 'Active Branch:', 'status_active' => 'Active', 'status_inactive' => 'Inactive',
+        'no_location' => 'Location not set', 'no_manager' => 'No storekeeper assigned', 'confirm_delete' => 'Confirm delete warehouse?'
     ]
 ][$isRtl ? 'ar' : 'en'];
 ?>
 
 <style>
     :root {
-        --c-amber: #f59e0b;
-        --c-amber-dark: #d97706;
-        --c-amber-light: #fef3c7;
-        --c-border: #cbd5e1;
-        --c-text-dark: #0f172a;
-        --c-text-muted: #475569;
+        --c-amber: #f59e0b; --c-amber-dark: #d97706; --c-amber-light: #fef3c7;
+        --c-border: #cbd5e1; --c-text-dark: #0f172a; --c-text-muted: #475569;
     }
 
     .mod-wrapper { padding-bottom: 40px; font-family: <?= $isRtl ? "'Cairo', sans-serif" : "'Inter', sans-serif" ?>; }
-    .mod-header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 24px; border-bottom: 1px solid #e2e8f0; padding-bottom: 16px; }
+    .mod-header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 16px; border-bottom: 1px solid #e2e8f0; padding-bottom: 16px; }
     .mod-title-box { display: flex; align-items: center; gap: 16px; }
     .mod-icon { width: 48px; height: 48px; background: var(--c-amber-light); color: var(--c-amber); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.8rem; box-shadow: 0 4px 10px rgba(245, 158, 11, 0.15); }
     .mod-title { margin: 0; color: var(--c-text-dark); font-size: 1.6rem; font-weight: 800; }
@@ -41,6 +47,8 @@ $t = [
     
     .btn-primary { background: linear-gradient(135deg, var(--c-amber), var(--c-amber-dark)); color: #ffffff !important; border: none; padding: 10px 24px; border-radius: 10px; font-weight: 800; display: inline-flex; align-items: center; gap: 8px; text-decoration: none; box-shadow: 0 4px 12px rgba(245, 158, 11, 0.25); transition: 0.2s; }
     .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(245, 158, 11, 0.35); }
+
+    .branch-scope-badge { display: inline-flex; align-items: center; gap: 8px; background: #f8fafc; border: 1px solid var(--c-border); padding: 6px 14px; border-radius: 20px; font-size: 0.8rem; font-weight: 800; color: var(--c-text-dark); margin-bottom: 24px; }
 
     .kpi-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 24px; }
     .kpi-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 16px 20px; display: flex; align-items: center; gap: 16px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
@@ -85,30 +93,37 @@ $t = [
         <a href="/ERP/inventory/warehouses/create" class="btn-primary"><i class="ph-bold ph-plus"></i> <?= $t['add_btn'] ?></a>
     </div>
 
+    <div>
+        <div class="branch-scope-badge">
+            <i class="ph-bold ph-storefront" style="color:var(--c-amber);"></i>
+            <span><?= $t['active_scope'] ?></span>
+            <span style="color:var(--c-amber); font-weight:900;"><?= htmlspecialchars($activeBranchName) ?></span>
+        </div>
+    </div>
+
     <?php if($flashMsg): ?><div style="background: #ecfdf5; color: #059669; padding: 16px; border-radius: 12px; margin-bottom: 24px; font-weight: 700; border: 1px solid #a7f3d0;"><i class="ph-fill ph-check-circle"></i> <?= htmlspecialchars($flashMsg) ?></div><?php endif; ?>
     <?php if($flashErr): ?><div style="background: #fef2f2; color: #dc2626; padding: 16px; border-radius: 12px; margin-bottom: 24px; font-weight: 700; border: 1px solid #fecaca;"><i class="ph-fill ph-warning-circle"></i> <?= htmlspecialchars($flashErr) ?></div><?php endif; ?>
 
     <div class="kpi-row">
         <div class="kpi-card">
             <div class="kpi-icon"><i class="ph-duotone ph-buildings"></i></div>
-            <div class="kpi-info"><h4>إجمالي المستودعات</h4><p><?= number_format($stats->total ?? 0) ?></p></div>
+            <div class="kpi-info"><h4><?= $t['kpi_total'] ?></h4><p><?= number_format($stats->total ?? 0) ?></p></div>
         </div>
         <div class="kpi-card" style="border-bottom: 3px solid #059669;">
             <div class="kpi-icon" style="background:#ecfdf5; color:#059669;"><i class="ph-duotone ph-check-circle"></i></div>
-            <div class="kpi-info"><h4 style="color:#059669;">مستودعات نشطة</h4><p><?= number_format($stats->active ?? 0) ?></p></div>
+            <div class="kpi-info"><h4 style="color:#059669;"><?= $t['kpi_active'] ?></h4><p><?= number_format($stats->active ?? 0) ?></p></div>
         </div>
         <div class="kpi-card" style="border-bottom: 3px solid #dc2626;">
             <div class="kpi-icon" style="background:#fef2f2; color:#dc2626;"><i class="ph-duotone ph-minus-circle"></i></div>
-            <div class="kpi-info"><h4 style="color:#dc2626;">مستودعات متوقفة</h4><p><?= number_format($stats->inactive ?? 0) ?></p></div>
+            <div class="kpi-info"><h4 style="color:#dc2626;"><?= $t['kpi_inactive'] ?></h4><p><?= number_format($stats->inactive ?? 0) ?></p></div>
         </div>
     </div>
 
-    <!-- Search Form -->
     <form action="/ERP/inventory/warehouses" method="GET" class="search-bar">
-        <input type="text" name="search" class="search-input" placeholder="ابحث بكود المستودع، الاسم، الموقع، أو المسؤول..." value="<?= htmlspecialchars($search ?? '') ?>">
-        <button type="submit" class="btn-search"><i class="ph-bold ph-magnifying-glass"></i> بحث</button>
+        <input type="text" name="search" class="search-input" placeholder="<?= $t['search_ph'] ?>" value="<?= htmlspecialchars($search ?? '') ?>">
+        <button type="submit" class="btn-search"><i class="ph-bold ph-magnifying-glass"></i> <?= $t['btn_search'] ?></button>
         <?php if(!empty($search)): ?>
-            <a href="/ERP/inventory/warehouses" class="btn-clear"><i class="ph-bold ph-x"></i> إلغاء</a>
+            <a href="/ERP/inventory/warehouses" class="btn-clear"><i class="ph-bold ph-x"></i> <?= $t['btn_clear'] ?></a>
         <?php endif; ?>
     </form>
 
@@ -128,25 +143,26 @@ $t = [
                 <?php else: foreach ($warehouses as $w): ?>
                     <tr>
                         <td>
-                            <div style="font-weight: 800; color: var(--c-text-dark);"><?= htmlspecialchars($w->name_ar) ?></div>
+                            <div style="font-weight: 800; color: var(--c-text-dark);"><?= htmlspecialchars((string)($isRtl ? ($w->name_ar ?? '') : ($w->name_en ?: ($w->name_ar ?? '')))) ?></div>
                             <div style="font-weight: 900; color: var(--c-amber); font-family: monospace; font-size: 0.85rem; margin-top: 4px;">
-                                <i class="ph-bold ph-hash"></i> <?= htmlspecialchars($w->code) ?> 
+                                <i class="ph-bold ph-hash"></i> <?= htmlspecialchars((string)($w->code ?? '---')) ?> 
                             </div>
                         </td>
                         <td>
-                            <div style="font-weight: 700; color: #334155;"><i class="ph-fill ph-map-pin text-slate-400"></i> <?= htmlspecialchars($w->location ?? 'غير محدد') ?></div>
+                            <div style="font-weight: 700; color: #334155;"><i class="ph-fill ph-map-pin text-slate-400"></i> <?= htmlspecialchars((string)($w->location ?? $t['no_location'])) ?></div>
                             <div style="color: var(--c-text-muted); font-size: 0.8rem; margin-top:4px;">
-                                <i class="ph-fill ph-user text-slate-400"></i> <?= htmlspecialchars($w->manager_name ?? 'بدون أمين مخزن') ?>
-                                <?= !empty($w->phone) ? " | <i class='ph-fill ph-phone'></i> <span dir='ltr'>{$w->phone}</span>" : '' ?>
+                                <i class="ph-fill ph-user text-slate-400"></i> <?= htmlspecialchars((string)($w->manager_name ?? $t['no_manager'])) ?>
+                                <?= !empty($w->phone) ? " | <i class='ph-fill ph-phone'></i> <span dir='ltr'>" . htmlspecialchars($w->phone) . "</span>" : '' ?>
                             </div>
                         </td>
                         <td style="text-align: center;">
-                            <?php if($w->is_active): ?> <span class="status-active">نشط</span>
-                            <?php else: ?> <span class="status-inactive">موقوف</span> <?php endif; ?>
+                            <?php if(!empty($w->is_active)): ?> <span class="status-active"><?= $t['status_active'] ?></span>
+                            <?php else: ?> <span class="status-inactive"><?= $t['status_inactive'] ?></span> <?php endif; ?>
                         </td>
                         <td style="text-align: center; white-space: nowrap;">
+                            <a href="/ERP/inventory/warehouses/<?= $w->id ?>" class="action-btn" title="عرض البطاقة"><i class="ph-bold ph-eye"></i></a>
                             <a href="/ERP/inventory/warehouses/<?= $w->id ?>/edit" class="action-btn" title="تعديل"><i class="ph-bold ph-pencil-simple"></i></a>
-                            <form action="/ERP/inventory/warehouses/<?= $w->id ?>/delete" method="POST" style="display:inline;" onsubmit="return confirm('تأكيد حذف المستودع؟');">
+                            <form action="/ERP/inventory/warehouses/<?= $w->id ?>/delete" method="POST" style="display:inline;" onsubmit="return confirm('<?= $t['confirm_delete'] ?>');">
                                 <button type="submit" class="action-btn delete" title="حذف"><i class="ph-bold ph-trash"></i></button>
                             </form>
                         </td>

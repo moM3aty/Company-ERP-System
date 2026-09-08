@@ -8,25 +8,35 @@ $flashMsg = $_SESSION['flash_msg'] ?? null;
 $flashErr = $_SESSION['flash_err'] ?? null;
 unset($_SESSION['flash_msg'], $_SESSION['flash_err']);
 
+$activeBranchName = $_SESSION['active_branch_name'] ?? ($isRtl ? 'كل الفروع' : 'All Branches');
+
 $t = [
     'ar' => [
         'title' => 'التحويلات المخزنية', 'desc' => 'إدارة نقل البضائع بين المستودعات والفروع وتتبع حالة الشحنات.',
         'add_btn' => 'أمر تحويل جديد', 'col_num' => 'رقم التحويل', 'col_route' => 'مسار التحويل (من ➔ إلى)',
-        'col_date' => 'التاريخ', 'col_status' => 'الحالة', 'col_actions' => 'إجراءات', 'empty' => 'لا توجد تحويلات تطابق بحثك.'
+        'col_date' => 'التاريخ', 'col_status' => 'الحالة', 'col_actions' => 'إجراءات', 'empty' => 'لا توجد تحويلات تطابق بحثك.',
+        'search_ph' => 'ابحث برقم التحويل، أو اسم المستودع (من/إلى)...', 'btn_search' => 'بحث', 'btn_clear' => 'إلغاء',
+        'kpi_total' => 'إجمالي التحويلات', 'kpi_transit' => 'شحنات قيد النقل', 'kpi_completed' => 'تحويلات مكتملة ومستلمة',
+        'active_scope' => 'الفرع النشط:',
+        'confirm_delete' => 'هل أنت متأكد من حذف أمر التحويل؟'
     ],
     'en' => [
         'title' => 'Stock Transfers', 'desc' => 'Manage goods movement between warehouses and track transit status.',
         'add_btn' => 'New Transfer', 'col_num' => 'Transfer No.', 'col_route' => 'Route (From ➔ To)',
-        'col_date' => 'Date', 'col_status' => 'Status', 'col_actions' => 'Actions', 'empty' => 'No stock transfers found.'
+        'col_date' => 'Date', 'col_status' => 'Status', 'col_actions' => 'Actions', 'empty' => 'No stock transfers found.',
+        'search_ph' => 'Search by transfer number, or warehouse name...', 'btn_search' => 'Search', 'btn_clear' => 'Clear',
+        'kpi_total' => 'Total Transfers', 'kpi_transit' => 'In Transit', 'kpi_completed' => 'Completed & Received',
+        'active_scope' => 'Active Branch:',
+        'confirm_delete' => 'Are you sure you want to delete this transfer?'
     ]
 ][$isRtl ? 'ar' : 'en'];
 
-function getTransferBadge($status) {
+function getTransferBadge($status, $isRtl) {
     $map = [
-        'draft' => ['bg' => '#f1f5f9', 'color' => '#64748b', 'label' => 'مسودة'],
-        'in_transit' => ['bg' => '#fff7ed', 'color' => '#ea580c', 'label' => 'قيد النقل'],
-        'completed' => ['bg' => '#ecfdf5', 'color' => '#059669', 'label' => 'مستلم ومكتمل'],
-        'cancelled' => ['bg' => '#fef2f2', 'color' => '#dc2626', 'label' => 'ملغى']
+        'draft' => ['bg' => '#f1f5f9', 'color' => '#64748b', 'label' => $isRtl ? 'مسودة' : 'Draft'],
+        'in_transit' => ['bg' => '#fff7ed', 'color' => '#ea580c', 'label' => $isRtl ? 'قيد النقل' : 'In Transit'],
+        'completed' => ['bg' => '#ecfdf5', 'color' => '#059669', 'label' => $isRtl ? 'مستلم ومكتمل' : 'Completed'],
+        'cancelled' => ['bg' => '#fef2f2', 'color' => '#dc2626', 'label' => $isRtl ? 'ملغى' : 'Cancelled']
     ];
     $s = $map[$status] ?? $map['draft'];
     return "<span style='background:{$s['bg']}; color:{$s['color']}; padding:4px 12px; border-radius:8px; font-weight:800; font-size:0.75rem; border:1px solid currentColor;'>{$s['label']}</span>";
@@ -44,7 +54,7 @@ function getTransferBadge($status) {
     }
 
     .mod-wrapper { padding-bottom: 40px; font-family: <?= $isRtl ? "'Cairo', sans-serif" : "'Inter', sans-serif" ?>; }
-    .mod-header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 24px; border-bottom: 1px solid #e2e8f0; padding-bottom: 16px; }
+    .mod-header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 16px; border-bottom: 1px solid #e2e8f0; padding-bottom: 16px; }
     .mod-title-box { display: flex; align-items: center; gap: 16px; }
     .mod-icon { width: 48px; height: 48px; background: var(--c-amber-light); color: var(--c-amber); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.8rem; box-shadow: 0 4px 10px rgba(245, 158, 11, 0.15); }
     .mod-title { margin: 0; color: var(--c-text-dark); font-size: 1.6rem; font-weight: 800; }
@@ -52,6 +62,8 @@ function getTransferBadge($status) {
     
     .btn-primary { background: linear-gradient(135deg, var(--c-amber), var(--c-amber-dark)); color: #ffffff !important; border: none; padding: 10px 24px; border-radius: 10px; font-weight: 800; display: inline-flex; align-items: center; gap: 8px; text-decoration: none; box-shadow: 0 4px 12px rgba(245, 158, 11, 0.25); transition: 0.2s; }
     .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(245, 158, 11, 0.35); }
+
+    .branch-scope-badge { display: inline-flex; align-items: center; gap: 8px; background: #f8fafc; border: 1px solid var(--c-border); padding: 6px 14px; border-radius: 20px; font-size: 0.8rem; font-weight: 800; color: var(--c-text-dark); margin-bottom: 24px; }
 
     .kpi-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 24px; }
     .kpi-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 16px 20px; display: flex; align-items: center; gap: 16px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
@@ -95,30 +107,38 @@ function getTransferBadge($status) {
         <a href="/ERP/inventory/stock/transfers/create" class="btn-primary"><i class="ph-bold ph-plus"></i> <?= $t['add_btn'] ?></a>
     </div>
 
+    <div>
+        <div class="branch-scope-badge">
+            <i class="ph-bold ph-storefront" style="color:var(--c-amber);"></i>
+            <span><?= $t['active_scope'] ?></span>
+            <span style="color:var(--c-amber); font-weight:900;"><?= htmlspecialchars($activeBranchName) ?></span>
+        </div>
+    </div>
+
     <?php if($flashMsg): ?><div style="background: #ecfdf5; color: #059669; padding: 16px; border-radius: 12px; margin-bottom: 24px; font-weight: 700; border: 1px solid #a7f3d0;"><i class="ph-fill ph-check-circle"></i> <?= htmlspecialchars($flashMsg) ?></div><?php endif; ?>
     <?php if($flashErr): ?><div style="background: #fef2f2; color: #dc2626; padding: 16px; border-radius: 12px; margin-bottom: 24px; font-weight: 700; border: 1px solid #fecaca;"><i class="ph-fill ph-warning-circle"></i> <?= htmlspecialchars($flashErr) ?></div><?php endif; ?>
 
     <div class="kpi-row">
         <div class="kpi-card">
             <div class="kpi-icon"><i class="ph-duotone ph-files"></i></div>
-            <div class="kpi-info"><h4>إجمالي التحويلات</h4><p><?= number_format($stats->total ?? 0) ?></p></div>
+            <div class="kpi-info"><h4><?= $t['kpi_total'] ?></h4><p><?= number_format($stats->total ?? 0) ?></p></div>
         </div>
         <div class="kpi-card" style="border-bottom: 3px solid #ea580c;">
             <div class="kpi-icon" style="background:#fff7ed; color:#ea580c;"><i class="ph-duotone ph-truck"></i></div>
-            <div class="kpi-info"><h4 style="color:#ea580c;">شحنات قيد النقل</h4><p><?= number_format($stats->in_transit ?? 0) ?></p></div>
+            <div class="kpi-info"><h4 style="color:#ea580c;"><?= $t['kpi_transit'] ?></h4><p><?= number_format($stats->in_transit ?? 0) ?></p></div>
         </div>
         <div class="kpi-card" style="border-bottom: 3px solid #059669;">
             <div class="kpi-icon" style="background:#ecfdf5; color:#059669;"><i class="ph-duotone ph-check-circle"></i></div>
-            <div class="kpi-info"><h4 style="color:#059669;">تحويلات مكتملة ومستلمة</h4><p><?= number_format($stats->completed ?? 0) ?></p></div>
+            <div class="kpi-info"><h4 style="color:#059669;"><?= $t['kpi_completed'] ?></h4><p><?= number_format($stats->completed ?? 0) ?></p></div>
         </div>
     </div>
 
     <!-- Search Form -->
     <form action="/ERP/inventory/stock/transfers" method="GET" class="search-bar">
-        <input type="text" name="search" class="search-input" placeholder="ابحث برقم التحويل، أو اسم المستودع (من/إلى)..." value="<?= htmlspecialchars($search ?? '') ?>">
-        <button type="submit" class="btn-search"><i class="ph-bold ph-magnifying-glass"></i> بحث</button>
+        <input type="text" name="search" class="search-input" placeholder="<?= $t['search_ph'] ?>" value="<?= htmlspecialchars($search ?? '') ?>">
+        <button type="submit" class="btn-search"><i class="ph-bold ph-magnifying-glass"></i> <?= $t['btn_search'] ?></button>
         <?php if(!empty($search)): ?>
-            <a href="/ERP/inventory/stock/transfers" class="btn-clear"><i class="ph-bold ph-x"></i> إلغاء</a>
+            <a href="/ERP/inventory/stock/transfers" class="btn-clear"><i class="ph-bold ph-x"></i> <?= $t['btn_clear'] ?></a>
         <?php endif; ?>
     </form>
 
@@ -139,26 +159,26 @@ function getTransferBadge($status) {
                 <?php else: foreach ($transfers as $tr): ?>
                     <tr>
                         <td>
-                            <div style="font-weight: 900; color: var(--c-amber); font-family: monospace; font-size: 1.05rem;"><i class="ph-bold ph-hash"></i> <?= htmlspecialchars($tr->transfer_number) ?></div>
-                            <div style="color: var(--c-text-muted); font-size: 0.8rem; margin-top:2px;">أصناف: <strong><?= $tr->items_count ?></strong></div>
+                            <div style="font-weight: 900; color: var(--c-amber); font-family: monospace; font-size: 1.05rem;"><i class="ph-bold ph-hash"></i> <?= htmlspecialchars((string)($tr->transfer_number ?? '')) ?></div>
+                            <div style="color: var(--c-text-muted); font-size: 0.8rem; margin-top:2px;">أصناف: <strong><?= (int)($tr->items_count ?? 0) ?></strong></div>
                         </td>
                         <td style="text-align: center;">
-                            <span style="font-weight: 800; color: var(--c-text-dark); background:#f8fafc; padding:4px 10px; border-radius:6px; border:1px solid #e2e8f0;"><?= htmlspecialchars($tr->from_wh_name) ?></span>
+                            <span style="font-weight: 800; color: var(--c-text-dark); background:#f8fafc; padding:4px 10px; border-radius:6px; border:1px solid #e2e8f0;"><?= htmlspecialchars((string)($tr->from_wh_name ?? '---')) ?></span>
                             <i class="ph-fill <?= $isRtl ? 'ph-arrow-circle-left' : 'ph-arrow-circle-right' ?> route-arrow"></i>
-                            <span style="font-weight: 800; color: var(--c-text-dark); background:#f8fafc; padding:4px 10px; border-radius:6px; border:1px solid #e2e8f0;"><?= htmlspecialchars($tr->to_wh_name) ?></span>
+                            <span style="font-weight: 800; color: var(--c-text-dark); background:#f8fafc; padding:4px 10px; border-radius:6px; border:1px solid #e2e8f0;"><?= htmlspecialchars((string)($tr->to_wh_name ?? '---')) ?></span>
                         </td>
                         <td>
-                            <div style="font-weight: 700; color: #334155;"><i class="ph-bold ph-calendar-blank"></i> <?= $tr->transfer_date ?></div>
+                            <div style="font-weight: 700; color: #334155;"><i class="ph-bold ph-calendar-blank"></i> <?= htmlspecialchars((string)($tr->transfer_date ?? '')) ?></div>
                         </td>
                         <td style="text-align: center;">
-                            <?= getTransferBadge($tr->status) ?>
+                            <?= getTransferBadge($tr->status ?? 'draft', $isRtl) ?>
                         </td>
                         <td style="text-align: center; white-space: nowrap;">
                             <a href="/ERP/inventory/stock/transfers/<?= $tr->id ?>" class="action-btn" title="معاينة وطباعة"><i class="ph-bold ph-printer"></i></a>
                             
-                            <?php if($tr->status !== 'completed'): ?>
+                            <?php if(($tr->status ?? '') !== 'completed'): ?>
                                 <a href="/ERP/inventory/stock/transfers/<?= $tr->id ?>/edit" class="action-btn" title="تعديل"><i class="ph-bold ph-pencil-simple"></i></a>
-                                <form action="/ERP/inventory/stock/transfers/<?= $tr->id ?>/delete" method="POST" style="display:inline;" onsubmit="return confirm('هل أنت متأكد من حذف أمر التحويل؟');">
+                                <form action="/ERP/inventory/stock/transfers/<?= $tr->id ?>/delete" method="POST" style="display:inline;" onsubmit="return confirm('<?= $t['confirm_delete'] ?>');">
                                     <button type="submit" class="action-btn delete" title="حذف"><i class="ph-bold ph-trash"></i></button>
                                 </form>
                             <?php endif; ?>

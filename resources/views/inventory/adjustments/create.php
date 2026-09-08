@@ -3,17 +3,54 @@
 
 if (session_status() === PHP_SESSION_NONE) session_start();
 $isRtl = ($_SESSION['locale'] ?? 'ar') === 'ar';
+$currency = function_exists('current_currency') ? current_currency() : 'EGP';
 $isEdit = isset($adj) && $adj !== null && !empty($adj->id);
-$actionUrl = $isEdit ? "/ERP/inventory/adjustments/{$adj->id}/update" : "/ERP/inventory/adjustments/store";
+$actionUrl = $isEdit ? "/ERP/inventory/adjustments/" . (int)$adj->id . "/update" : "/ERP/inventory/adjustments/store";
+
+$activeBranchName = $_SESSION['active_branch_name'] ?? ($isRtl ? 'كل الفروع' : 'All Branches');
+
+$t = [
+    'ar' => [
+        'title_new' => 'إصدار إذن تسوية مخزنية جديد', 'title_edit' => 'تعديل إذن التسوية المخزنية',
+        'panel_basic' => 'البيانات الأساسية', 'type' => 'نوع التسوية',
+        'type_add' => 'إضافة رصيد (تسوية فائض جرد)', 'type_sub' => 'خصم رصيد (تسوية عجز أو تالف)',
+        'warehouse' => 'المستودع المعني', 'choose_wh' => '-- اختر المستودع --',
+        'reason' => 'السبب الرئيسي / البيان', 'reason_ph' => 'مثال: جرد سنوي، أصناف متضررة...',
+        'num' => 'رقم إذن التسوية', 'date' => 'تاريخ التسوية', 'status' => 'حالة الإذن',
+        'status_draft' => 'مسودة (قيد التدقيق)', 'status_approved' => 'معتمد ومرحل مخزنياً (نهائي)',
+        'notes' => 'ملاحظات تفصيلية', 'notes_ph' => 'ملاحظات لجذور سبب التسوية أو قرارات لجنة الجرد...',
+        'panel_items' => 'الأصناف المعدلة', 'add_item' => 'إضافة صنف',
+        'col_item' => 'الصنف (الكود والاسم)', 'choose_item' => '-- اختر الصنف --',
+        'col_qty' => 'الكمية المعدلة', 'col_cost' => "التكلفة التقديرية (بـ $currency)",
+        'col_remove' => 'إزالة', 'cancel' => 'إلغاء وتراجع', 'save' => 'حفظ وإصدار التسوية',
+        'update' => 'تحديث البيانات', 'active_scope' => 'الفرع النشط:'
+    ],
+    'en' => [
+        'title_new' => 'Issue New Stock Adjustment', 'title_edit' => 'Edit Stock Adjustment',
+        'panel_basic' => 'Basic Information', 'type' => 'Adjustment Type',
+        'type_add' => 'Addition (Inventory Surplus)', 'type_sub' => 'Deduction (Deficit or Damaged)',
+        'warehouse' => 'Warehouse', 'choose_wh' => '-- Select Warehouse --',
+        'reason' => 'Main Reason / Details', 'reason_ph' => 'e.g. Annual audit, damaged items...',
+        'num' => 'Adjustment Number', 'date' => 'Adjustment Date', 'status' => 'Status',
+        'status_draft' => 'Draft (Pending)', 'status_approved' => 'Approved & Posted',
+        'notes' => 'Detailed Notes', 'notes_ph' => 'Notes regarding root cause or audit committee...',
+        'panel_items' => 'Adjusted Items', 'add_item' => 'Add Item',
+        'col_item' => 'Item (Code & Name)', 'choose_item' => '-- Select Item --',
+        'col_qty' => 'Adjusted Qty', 'col_cost' => "Est. Unit Cost (in $currency)",
+        'col_remove' => 'Remove', 'cancel' => 'Cancel', 'save' => 'Save & Issue Adjustment',
+        'update' => 'Update Data', 'active_scope' => 'Active Branch:'
+    ]
+][$isRtl ? 'ar' : 'en'];
 ?>
 
 <style>
     :root { --c-amber: #f59e0b; --c-amber-dark: #d97706; --c-border: #cbd5e1; --c-bg: #f8fafc; }
     .form-wrapper { max-width: 950px; margin: 0 auto; padding-bottom: 80px; font-family: <?= $isRtl ? "'Cairo', sans-serif" : "'Inter', sans-serif" ?>; }
-    .form-header { display: flex; align-items: center; gap: 16px; margin-bottom: 24px; border-bottom: 1px solid #e2e8f0; padding-bottom: 16px; }
+    .form-header { display: flex; align-items: center; gap: 16px; margin-bottom: 16px; border-bottom: 1px solid #e2e8f0; padding-bottom: 16px; }
     .back-btn { width: 42px; height: 42px; border-radius: 12px; background: #ffffff; border: 1px solid var(--c-border); display: inline-flex; align-items: center; justify-content: center; text-decoration: none; color: #64748b; }
+    .branch-scope-badge { display: inline-flex; align-items: center; gap: 8px; background: #f8fafc; border: 1px solid var(--c-border); padding: 6px 14px; border-radius: 20px; font-size: 0.8rem; font-weight: 800; color: #0f172a; margin-bottom: 20px; }
     .panel-card { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 18px; padding: 28px; margin-bottom: 24px; border-top: 4px solid var(--c-amber); }
-    .form-control { width: 100%; padding: 12px 16px; border: 1px solid var(--c-border); border-radius: 10px; font-family: inherit; font-size: 0.95rem; background: var(--c-bg); color: #0f172a; }
+    .form-control { width: 100%; padding: 12px 16px; border: 1px solid var(--c-border); border-radius: 10px; font-family: inherit; font-size: 0.95rem; background: var(--c-bg); color: #0f172a; box-sizing: border-box; }
     .input-label { font-size: 0.85rem; font-weight: 800; margin-bottom: 8px; display: block; color: #475569; }
     .grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px; }
     .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
@@ -29,79 +66,87 @@ $actionUrl = $isEdit ? "/ERP/inventory/adjustments/{$adj->id}/update" : "/ERP/in
 
 <div class="form-wrapper" dir="<?= $isRtl ? 'rtl' : 'ltr' ?>">
     <div class="form-header">
-        <a href="/ERP/inventory/adjustments" class="back-btn"><i class="ph-bold ph-arrow-right"></i></a>
-        <h2 style="margin:0; font-size:1.6rem; color:#0f172a; font-weight:800;"><?= $isEdit ? 'تعديل إذن التسوية المخزنية' : 'إصدار إذن تسوية مخزنية جديد' ?></h2>
+        <a href="/ERP/inventory/adjustments" class="back-btn"><i class="ph-bold <?= $isRtl ? 'ph-arrow-right' : 'ph-arrow-left' ?>"></i></a>
+        <h2 style="margin:0; font-size:1.6rem; color:#0f172a; font-weight:800;"><?= $isEdit ? $t['title_edit'] : $t['title_new'] ?></h2>
+    </div>
+
+    <div>
+        <div class="branch-scope-badge">
+            <i class="ph-bold ph-storefront" style="color:var(--c-amber);"></i>
+            <span><?= $t['active_scope'] ?></span>
+            <span style="color:var(--c-amber); font-weight:900;"><?= htmlspecialchars($activeBranchName) ?></span>
+        </div>
     </div>
 
     <?php if(isset($_SESSION['flash_err'])): ?>
-        <div style="background: #fef2f2; color: #dc2626; padding: 16px; border-radius: 12px; margin-bottom: 24px; border: 1px solid #fecaca; font-weight:bold;"><i class="ph-bold ph-warning-circle"></i> <?= $_SESSION['flash_err']; unset($_SESSION['flash_err']); ?></div>
+        <div style="background: #fef2f2; color: #dc2626; padding: 16px; border-radius: 12px; margin-bottom: 24px; border: 1px solid #fecaca; font-weight:bold;"><i class="ph-bold ph-warning-circle"></i> <?= htmlspecialchars($_SESSION['flash_err']); unset($_SESSION['flash_err']); ?></div>
     <?php endif; ?>
 
     <form action="<?= $actionUrl ?>" method="POST" id="adjForm">
         <div class="panel-card">
-            <h3 style="margin: 0 0 20px 0; border-bottom: 1px solid #f1f5f9; padding-bottom: 10px; font-size:1.1rem; font-weight:800; color:#0f172a;"><i class="ph-duotone ph-scales" style="color:var(--c-amber);"></i> البيانات الأساسية</h3>
+            <h3 style="margin: 0 0 20px 0; border-bottom: 1px solid #f1f5f9; padding-bottom: 10px; font-size:1.1rem; font-weight:800; color:#0f172a;"><i class="ph-duotone ph-scales" style="color:var(--c-amber);"></i> <?= $t['panel_basic'] ?></h3>
             <div class="grid-3">
                 <div>
-                    <label class="input-label">نوع التسوية <span style="color:red">*</span></label>
+                    <label class="input-label"><?= $t['type'] ?> <span style="color:red">*</span></label>
                     <select name="adjustment_type" class="form-control" style="font-weight:800;" required>
-                        <?php $at = $isEdit ? $adj->adjustment_type : 'addition'; ?>
-                        <option value="addition" <?= $at=='addition' ? 'selected' : '' ?>>إضافة رصيد (تسوية فائض جرد)</option>
-                        <option value="subtraction" <?= $at=='subtraction' ? 'selected' : '' ?>>خصم رصيد (تسوية عجز أو تالف)</option>
+                        <?php $at = $isEdit ? ($adj->adjustment_type ?? 'addition') : 'addition'; ?>
+                        <option value="addition" <?= $at=='addition' ? 'selected' : '' ?>><?= $t['type_add'] ?></option>
+                        <option value="subtraction" <?= $at=='subtraction' ? 'selected' : '' ?>><?= $t['type_sub'] ?></option>
                     </select>
                 </div>
                 <div>
-                    <label class="input-label">المستودع المعني <span style="color:red">*</span></label>
+                    <label class="input-label"><?= $t['warehouse'] ?> <span style="color:red">*</span></label>
                     <select name="warehouse_id" class="form-control" required>
-                        <option value="">-- اختر المستودع --</option>
-                        <?php foreach($warehouses ?? [] as $w): ?>
-                            <option value="<?= $w->id ?>" <?= ($isEdit && $adj->warehouse_id == $w->id) ? 'selected' : '' ?>><?= htmlspecialchars($w->name_ar) ?></option>
+                        <option value=""><?= $t['choose_wh'] ?></option>
+                        <?php foreach($warehouses ?? [] as $w): $wName = $isRtl ? ($w->name_ar ?? '') : ($w->name_en ?: ($w->name_ar ?? '')); ?>
+                            <option value="<?= $w->id ?>" <?= ($isEdit && ($adj->warehouse_id ?? 0) == $w->id) ? 'selected' : '' ?>><?= htmlspecialchars($wName) ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>
                 <div>
-                    <label class="input-label">السبب الرئيسي / البيان <span style="color:red">*</span></label>
-                    <input type="text" name="reason" class="form-control" value="<?= $isEdit ? htmlspecialchars($adj->reason ?? '') : '' ?>" placeholder="مثال: جرد سنوي، أصناف متضررة..." required>
+                    <label class="input-label"><?= $t['reason'] ?> <span style="color:red">*</span></label>
+                    <input type="text" name="reason" class="form-control" value="<?= htmlspecialchars((string)($isEdit ? ($adj->reason ?? '') : '')) ?>" placeholder="<?= $t['reason_ph'] ?>" required>
                 </div>
             </div>
 
             <div class="grid-3" style="margin-top: 24px;">
                 <div>
-                    <label class="input-label">رقم إذن التسوية</label>
-                    <input type="text" name="adjustment_number" class="form-control" style="font-family:monospace; font-weight:bold; color:var(--c-amber-dark);" value="<?= $isEdit ? htmlspecialchars($adj->adjustment_number) : '' ?>" readonly placeholder="تلقائي">
+                    <label class="input-label"><?= $t['num'] ?></label>
+                    <input type="text" name="adjustment_number" class="form-control" style="font-family:monospace; font-weight:bold; color:var(--c-amber-dark);" value="<?= $isEdit ? htmlspecialchars((string)($adj->adjustment_number ?? '')) : '' ?>" readonly placeholder="Auto">
                 </div>
                 <div>
-                    <label class="input-label">تاريخ التسوية <span style="color:red">*</span></label>
-                    <input type="date" name="adjustment_date" class="form-control" value="<?= $isEdit ? htmlspecialchars($adj->adjustment_date) : date('Y-m-d') ?>" required>
+                    <label class="input-label"><?= $t['date'] ?> <span style="color:red">*</span></label>
+                    <input type="date" name="adjustment_date" class="form-control" value="<?= $isEdit ? htmlspecialchars((string)($adj->adjustment_date ?? '')) : date('Y-m-d') ?>" required>
                 </div>
                 <div>
-                    <label class="input-label">حالة الإذن</label>
+                    <label class="input-label"><?= $t['status'] ?></label>
                     <select name="status" class="form-control" style="font-weight: 800;">
-                        <?php $st = $isEdit ? $adj->status : 'draft'; ?>
-                        <option value="draft" <?= $st=='draft' ? 'selected' : '' ?>>مسودة (قيد التدقيق)</option>
-                        <option value="approved" <?= $st=='approved' ? 'selected' : '' ?>>معتمد ومرحل مخزنياً (نهائي)</option>
+                        <?php $st = $isEdit ? ($adj->status ?? 'draft') : 'draft'; ?>
+                        <option value="draft" <?= $st=='draft' ? 'selected' : '' ?>><?= $t['status_draft'] ?></option>
+                        <option value="approved" <?= $st=='approved' ? 'selected' : '' ?>><?= $t['status_approved'] ?></option>
                     </select>
                 </div>
             </div>
             
             <div style="margin-top: 24px;">
-                <label class="input-label">ملاحظات تفصيلية</label>
-                <input type="text" name="notes" class="form-control" value="<?= $isEdit ? htmlspecialchars($adj->notes ?? '') : '' ?>" placeholder="ملاحظات لجذور سبب التسوية أو قرارات لجنة الجرد...">
+                <label class="input-label"><?= $t['notes'] ?></label>
+                <input type="text" name="notes" class="form-control" value="<?= $isEdit ? htmlspecialchars((string)($adj->notes ?? '')) : '' ?>" placeholder="<?= $t['notes_ph'] ?>">
             </div>
         </div>
 
         <div class="panel-card">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                <h3 style="margin:0; font-size:1.1rem; font-weight:800; color:#0f172a;"><i class="ph-duotone ph-list-plus" style="color:var(--c-amber);"></i> الأصناف المعدلة</h3>
-                <button type="button" onclick="addRow()" class="btn-add-row"><i class="ph-bold ph-plus"></i> إضافة صنف</button>
+                <h3 style="margin:0; font-size:1.1rem; font-weight:800; color:#0f172a;"><i class="ph-duotone ph-list-plus" style="color:var(--c-amber);"></i> <?= $t['panel_items'] ?></h3>
+                <button type="button" onclick="addRow()" class="btn-add-row"><i class="ph-bold ph-plus"></i> <?= $t['add_item'] ?></button>
             </div>
             
             <table class="items-table" id="itemsTable">
                 <thead>
                     <tr>
-                        <th style="width: 55%;">الصنف (الكود والاسم) <span style="color:red">*</span></th>
-                        <th style="width: 20%; text-align: center;">الكمية المعدلة <span style="color:red">*</span></th>
-                        <th style="width: 15%; text-align: center;">التكلفة التقديرية</th>
-                        <th style="width: 10%; text-align: center;">إزالة</th>
+                        <th style="width: 55%;"><?= $t['col_item'] ?> <span style="color:red">*</span></th>
+                        <th style="width: 20%; text-align: center;"><?= $t['col_qty'] ?> <span style="color:red">*</span></th>
+                        <th style="width: 15%; text-align: center;"><?= $t['col_cost'] ?></th>
+                        <th style="width: 10%; text-align: center;"><?= $t['col_remove'] ?></th>
                     </tr>
                 </thead>
                 <tbody id="itemsBody">
@@ -109,14 +154,14 @@ $actionUrl = $isEdit ? "/ERP/inventory/adjustments/{$adj->id}/update" : "/ERP/in
                         <tr>
                             <td>
                                 <select name="product_id[]" class="form-control" required>
-                                    <option value="">-- اختر الصنف --</option>
-                                    <?php foreach($products ?? [] as $p): ?>
-                                        <option value="<?= $p->id ?>" <?= $item->product_id == $p->id ? 'selected' : '' ?>><?= htmlspecialchars($p->code) ?> - <?= htmlspecialchars($p->name_ar) ?></option>
+                                    <option value=""><?= $t['choose_item'] ?></option>
+                                    <?php foreach($products ?? [] as $p): $pName = $isRtl ? ($p->name_ar ?? '') : ($p->name_en ?: ($p->name_ar ?? '')); ?>
+                                        <option value="<?= $p->id ?>" <?= ($item->product_id ?? 0) == $p->id ? 'selected' : '' ?>><?= htmlspecialchars($p->code) ?> - <?= htmlspecialchars($pName) ?></option>
                                     <?php endforeach; ?>
                                 </select>
                             </td>
-                            <td><input type="number" step="0.01" name="quantity[]" class="form-control" style="text-align:center; font-weight:900; font-family:monospace; font-size:1.1rem; color:var(--c-amber-dark);" value="<?= $item->quantity ?>" required></td>
-                            <td><input type="number" step="0.01" name="unit_cost[]" class="form-control" style="text-align:center; font-weight:800; font-family:monospace;" value="<?= $item->unit_cost ?>"></td>
+                            <td><input type="number" step="0.01" name="quantity[]" class="form-control" style="text-align:center; font-weight:900; font-family:monospace; font-size:1.1rem; color:var(--c-amber-dark);" value="<?= (float)($item->quantity ?? 1) ?>" required></td>
+                            <td><input type="number" step="0.01" name="unit_cost[]" class="form-control" style="text-align:center; font-weight:800; font-family:monospace;" value="<?= (float)($item->unit_cost ?? 0) ?>"></td>
                             <td style="text-align:center;"><button type="button" class="btn-remove-row" onclick="this.closest('tr').remove();"><i class="ph-bold ph-trash"></i></button></td>
                         </tr>
                     <?php endforeach; endif; ?>
@@ -125,8 +170,8 @@ $actionUrl = $isEdit ? "/ERP/inventory/adjustments/{$adj->id}/update" : "/ERP/in
         </div>
 
         <div class="sticky-footer">
-            <a href="/ERP/inventory/adjustments" class="btn-cancel">إلغاء وتراجع</a>
-            <button type="submit" class="btn-submit"><i class="ph-bold ph-floppy-disk"></i> <?= $isEdit ? 'تحديث البيانات' : 'حفظ وإصدار التسوية' ?></button>
+            <a href="/ERP/inventory/adjustments" class="btn-cancel"><?= $t['cancel'] ?></a>
+            <button type="submit" class="btn-submit"><i class="ph-bold ph-floppy-disk"></i> <?= $isEdit ? $t['update'] : $t['save'] ?></button>
         </div>
     </form>
 </div>
@@ -135,9 +180,9 @@ $actionUrl = $isEdit ? "/ERP/inventory/adjustments/{$adj->id}/update" : "/ERP/in
     <tr>
         <td>
             <select name="product_id[]" class="form-control" required>
-                <option value="">-- اختر الصنف --</option>
-                <?php foreach($products ?? [] as $p): ?>
-                    <option value="<?= $p->id ?>" data-cost="<?= $p->purchase_price ?>"><?= htmlspecialchars($p->code) ?> - <?= htmlspecialchars($p->name_ar) ?></option>
+                <option value=""><?= $t['choose_item'] ?></option>
+                <?php foreach($products ?? [] as $p): $pName = $isRtl ? ($p->name_ar ?? '') : ($p->name_en ?: ($p->name_ar ?? '')); ?>
+                    <option value="<?= $p->id ?>" data-cost="<?= $p->purchase_price ?>"><?= htmlspecialchars($p->code) ?> - <?= htmlspecialchars($pName) ?></option>
                 <?php endforeach; ?>
             </select>
         </td>

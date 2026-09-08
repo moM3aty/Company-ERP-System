@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1:3306
--- Generation Time: Aug 29, 2026 at 03:01 PM
+-- Generation Time: Sep 08, 2026 at 01:36 AM
 -- Server version: 11.8.8-MariaDB-log
 -- PHP Version: 7.2.34
 
@@ -30,6 +30,7 @@ SET time_zone = "+00:00";
 CREATE TABLE `accounts` (
   `id` bigint(20) UNSIGNED NOT NULL,
   `company_id` bigint(20) UNSIGNED NOT NULL DEFAULT 1,
+  `branch_id` int(11) DEFAULT 0,
   `code` varchar(50) NOT NULL,
   `name_en` varchar(255) NOT NULL,
   `name_ar` varchar(255) NOT NULL,
@@ -48,14 +49,14 @@ CREATE TABLE `accounts` (
 -- Dumping data for table `accounts`
 --
 
-INSERT INTO `accounts` (`id`, `company_id`, `code`, `name_en`, `name_ar`, `type`, `is_control_account`, `parent_id`, `account_level`, `is_parent`, `current_balance`, `is_active`, `created_at`, `opening_balance`) VALUES
-(1, 1, '1110', 'Main Bank Account', 'حساب البنك الرئيسي', 'asset', 0, NULL, 1, 0, 8000.00, 1, '2026-08-22 12:53:33', 0.00),
-(2, 1, '1120', 'Main Cashbox', 'الخزينة الرئيسية', 'asset', 0, NULL, 1, 0, 450000.00, 1, '2026-08-22 12:53:33', 0.00),
-(3, 1, '4100', 'Sales Revenue', 'إيرادات المبيعات', 'revenue', 0, NULL, 1, 0, 600.00, 1, '2026-08-22 12:53:33', 0.00),
-(4, 1, '2110', 'Accounts Payable', 'الدائنون (الموردين)', 'liability', 1, NULL, 1, 0, -600.00, 1, '2026-08-22 12:53:33', 0.00),
-(6, 1, '6100', 'Payroll Expense', 'مصروفات الرواتب', 'expense', 0, NULL, 1, 0, 0.00, 1, '2026-08-22 12:53:33', 0.00),
-(7, 1, '9517', '', 'محمد ابوالمعاطي', 'asset', 0, NULL, 1, 1, 20000.00, 1, '2026-08-23 19:41:10', 20000.00),
-(8, 1, '111002', 'Mohamed Abo-Elmaaty', 'محمد ابوالمعاطي', 'asset', 0, NULL, 1, 0, 8000.00, 1, '2026-08-25 03:12:48', 0.00);
+INSERT INTO `accounts` (`id`, `company_id`, `branch_id`, `code`, `name_en`, `name_ar`, `type`, `is_control_account`, `parent_id`, `account_level`, `is_parent`, `current_balance`, `is_active`, `created_at`, `opening_balance`) VALUES
+(1, 1, 1, '1110', 'Main Bank Account', 'حساب البنك الرئيسي', 'asset', 0, NULL, 1, 0, 8000.00, 1, '2026-08-22 12:53:33', 0.00),
+(2, 1, 1, '1120', 'Main Cashbox', 'الخزينة الرئيسية', 'asset', 0, NULL, 1, 0, 450000.00, 1, '2026-08-22 12:53:33', 0.00),
+(3, 1, 2, '4100', 'Sales Revenue', 'إيرادات المبيعات', 'revenue', 0, NULL, 1, 0, 600.00, 1, '2026-08-22 12:53:33', 0.00),
+(4, 1, 2, '2110', 'Accounts Payable', 'الدائنون (الموردين)', 'liability', 1, NULL, 1, 0, -600.00, 1, '2026-08-22 12:53:33', 0.00),
+(6, 1, 3, '6100', 'Payroll Expense', 'مصروفات الرواتب', 'expense', 0, NULL, 1, 0, 0.00, 1, '2026-08-22 12:53:33', 0.00),
+(7, 1, 3, '9517', '', 'محمد ابوالمعاطي', 'asset', 0, NULL, 1, 1, 20000.00, 1, '2026-08-23 19:41:10', 20000.00),
+(8, 1, 1, '111002', 'Mohamed Abo-Elmaaty', 'محمد ابوالمعاطي', 'asset', 0, NULL, 1, 0, 8000.00, 1, '2026-08-25 03:12:48', 0.00);
 
 -- --------------------------------------------------------
 
@@ -91,8 +92,11 @@ CREATE TABLE `bank_reconciliations` (
   `company_id` bigint(20) UNSIGNED DEFAULT 1,
   `reconciliation_number` varchar(50) NOT NULL,
   `account_id` bigint(20) UNSIGNED NOT NULL,
+  `reconciliation_date` date NOT NULL,
+  `branch_id` int(11) DEFAULT 0,
   `statement_date` date NOT NULL,
   `statement_balance` decimal(15,2) NOT NULL DEFAULT 0.00,
+  `system_balance` decimal(15,2) DEFAULT 0.00,
   `book_balance` decimal(15,2) NOT NULL DEFAULT 0.00,
   `cleared_debits` decimal(15,2) NOT NULL DEFAULT 0.00,
   `cleared_credits` decimal(15,2) NOT NULL DEFAULT 0.00,
@@ -111,8 +115,8 @@ CREATE TABLE `bank_reconciliations` (
 -- Dumping data for table `bank_reconciliations`
 --
 
-INSERT INTO `bank_reconciliations` (`id`, `company_id`, `reconciliation_number`, `account_id`, `statement_date`, `statement_balance`, `book_balance`, `cleared_debits`, `cleared_credits`, `outstanding_deposits`, `outstanding_payments`, `adjusted_bank_balance`, `adjusted_book_balance`, `difference`, `status`, `notes`, `created_at`, `updated_at`) VALUES
-(4, 1, 'BR-26080001', 4, '2026-08-23', -600.00, -600.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 'reconciled', '', '2026-08-23 21:17:13', '2026-08-23 21:17:20');
+INSERT INTO `bank_reconciliations` (`id`, `company_id`, `reconciliation_number`, `account_id`, `reconciliation_date`, `branch_id`, `statement_date`, `statement_balance`, `system_balance`, `book_balance`, `cleared_debits`, `cleared_credits`, `outstanding_deposits`, `outstanding_payments`, `adjusted_bank_balance`, `adjusted_book_balance`, `difference`, `status`, `notes`, `created_at`, `updated_at`) VALUES
+(4, 1, 'BR-26080001', 4, '0000-00-00', 1, '2026-08-23', -600.00, 0.00, -600.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 'reconciled', '', '2026-08-23 21:17:13', '2026-09-07 11:16:09');
 
 -- --------------------------------------------------------
 
@@ -137,7 +141,8 @@ CREATE TABLE `branches` (
   `id` bigint(20) UNSIGNED NOT NULL,
   `company_id` bigint(20) UNSIGNED NOT NULL,
   `branch_code` varchar(50) NOT NULL,
-  `name` varchar(150) NOT NULL,
+  `name_ar` varchar(255) NOT NULL,
+  `name_en` varchar(255) DEFAULT NULL,
   `phone` varchar(50) DEFAULT NULL,
   `email` varchar(150) DEFAULT NULL,
   `address` text DEFAULT NULL,
@@ -154,26 +159,32 @@ CREATE TABLE `branches` (
 CREATE TABLE `budgets` (
   `id` bigint(20) UNSIGNED NOT NULL,
   `company_id` bigint(20) UNSIGNED DEFAULT 1,
+  `branch_id` int(11) DEFAULT 0,
   `name_ar` varchar(255) NOT NULL,
+  `name_en` varchar(255) DEFAULT NULL,
   `code` varchar(50) NOT NULL,
   `fiscal_year` int(11) NOT NULL,
+  `total_amount` decimal(15,2) DEFAULT 0.00,
   `start_date` date NOT NULL,
   `end_date` date NOT NULL,
   `status` enum('draft','approved','closed') NOT NULL DEFAULT 'draft',
   `total_allocated` decimal(15,2) NOT NULL DEFAULT 0.00,
   `notes` text DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT current_timestamp(),
-  `updated_at` timestamp NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+  `updated_at` timestamp NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `account_id` int(11) DEFAULT NULL,
+  `cost_center_id` int(11) DEFAULT NULL,
+  `is_active` tinyint(1) DEFAULT 1
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
 
 --
 -- Dumping data for table `budgets`
 --
 
-INSERT INTO `budgets` (`id`, `company_id`, `name_ar`, `code`, `fiscal_year`, `start_date`, `end_date`, `status`, `total_allocated`, `notes`, `created_at`, `updated_at`) VALUES
-(1, 1, 'اسم / عنوان الموازنة *', 'CUST-61551787404225', 2026, '2026-01-01', '2026-12-31', 'approved', 4800.00, '', '2026-08-23 20:53:46', '2026-08-23 20:54:00'),
-(2, 1, 'مكتب خشبي إداري حديث', 'CC-200', 2026, '2026-01-01', '2026-12-31', 'draft', 3800.00, '', '2026-08-23 20:55:49', '2026-08-23 20:55:49'),
-(3, 1, 'Mohamed Abo-Elmaaty', '+6502+84', 2026, '2026-01-01', '2026-12-31', 'closed', 7200.00, '', '2026-08-23 20:56:16', '2026-08-23 20:56:16');
+INSERT INTO `budgets` (`id`, `company_id`, `branch_id`, `name_ar`, `name_en`, `code`, `fiscal_year`, `total_amount`, `start_date`, `end_date`, `status`, `total_allocated`, `notes`, `created_at`, `updated_at`, `account_id`, `cost_center_id`, `is_active`) VALUES
+(1, 1, 1, 'اسم / عنوان الموازنة *', NULL, 'CUST-61551787404225', 2026, 0.00, '2026-01-01', '2026-12-31', 'approved', 4800.00, '', '2026-08-23 20:53:46', '2026-09-07 10:29:01', NULL, NULL, 1),
+(2, 1, 1, 'مكتب خشبي إداري حديث', NULL, 'CC-200', 2026, 0.00, '2026-01-01', '2026-12-31', 'draft', 3800.00, '', '2026-08-23 20:55:49', '2026-09-07 10:29:04', NULL, NULL, 1),
+(3, 1, 2, 'Mohamed Abo-Elmaaty', NULL, '+6502+84', 2026, 0.00, '2026-01-01', '2026-12-31', 'closed', 7200.00, '', '2026-08-23 20:56:16', '2026-09-07 10:29:08', NULL, NULL, 1);
 
 -- --------------------------------------------------------
 
@@ -243,6 +254,7 @@ INSERT INTO `companies` (`id`, `company_code`, `name`, `legal_name`, `tax_number
 CREATE TABLE `cost_centers` (
   `id` bigint(20) UNSIGNED NOT NULL,
   `company_id` bigint(20) UNSIGNED NOT NULL DEFAULT 1,
+  `branch_id` int(11) DEFAULT 0,
   `code` varchar(50) NOT NULL,
   `name_en` varchar(255) NOT NULL,
   `budget_amount` decimal(15,2) NOT NULL DEFAULT 0.00,
@@ -257,9 +269,9 @@ CREATE TABLE `cost_centers` (
 -- Dumping data for table `cost_centers`
 --
 
-INSERT INTO `cost_centers` (`id`, `company_id`, `code`, `name_en`, `budget_amount`, `parent_id`, `is_parent`, `name_ar`, `is_active`, `created_at`) VALUES
-(1, 1, 'CC-100', 'Administration', 2000.00, NULL, 1, 'الإدارة العامة', 1, '2026-08-22 12:53:33'),
-(2, 1, 'CC-200', 'Sales Dept', 5000.00, 1, 0, 'قسم المبيعات', 1, '2026-08-22 12:53:33');
+INSERT INTO `cost_centers` (`id`, `company_id`, `branch_id`, `code`, `name_en`, `budget_amount`, `parent_id`, `is_parent`, `name_ar`, `is_active`, `created_at`) VALUES
+(1, 1, 1, 'CC-100', 'Administration', 2000.00, NULL, 1, 'الإدارة العامة', 1, '2026-08-22 12:53:33'),
+(2, 1, 1, 'CC-200', 'Sales Dept', 5000.00, 1, 0, 'قسم المبيعات', 1, '2026-08-22 12:53:33');
 
 -- --------------------------------------------------------
 
@@ -270,6 +282,7 @@ INSERT INTO `cost_centers` (`id`, `company_id`, `code`, `name_en`, `budget_amoun
 CREATE TABLE `crm_leads` (
   `id` bigint(20) UNSIGNED NOT NULL,
   `company_id` bigint(20) UNSIGNED NOT NULL DEFAULT 1,
+  `branch_id` int(11) DEFAULT NULL,
   `company_name` varchar(255) NOT NULL,
   `contact_person` varchar(255) NOT NULL,
   `email` varchar(255) DEFAULT NULL,
@@ -286,11 +299,11 @@ CREATE TABLE `crm_leads` (
 -- Dumping data for table `crm_leads`
 --
 
-INSERT INTO `crm_leads` (`id`, `company_id`, `company_name`, `contact_person`, `email`, `phone`, `source`, `status`, `score`, `next_follow_up`, `owner_id`, `created_at`) VALUES
-(7, 1, 'Nour Trust', 'Mohamed Abo-Elmaaty', 'moie.m3aty@gmail.com', '01273844735', 'Referral', 'converted', 10, '2026-08-23', 1, '2026-08-22 15:26:32'),
-(8, 1, 'Nour Trust', 'Mohamed Abo-Elmaaty', 'mome.m3aty@gmail.com', '01897444735', 'Referral', 'contacted', 50, '2026-08-23', 1, '2026-08-22 18:50:10'),
-(9, 1, 'Ahmed Salim ', 'Ahmed Salim', 'workahmed372@gmail.com', '+966501234567', 'Website', 'new', 10, '2026-08-29', 1, '2026-08-22 23:58:35'),
-(10, 1, 'Huda Ali Khamis ', 'Huda Ali ', 'huda@gmail.com', '057823890890787', 'Social Media', 'new', 10, '2026-08-31', 1, '2026-08-22 23:59:55');
+INSERT INTO `crm_leads` (`id`, `company_id`, `branch_id`, `company_name`, `contact_person`, `email`, `phone`, `source`, `status`, `score`, `next_follow_up`, `owner_id`, `created_at`) VALUES
+(7, 1, 1, 'Nour Trust', 'Mohamed Abo-Elmaaty', 'moie.m3aty@gmail.com', '01273844735', 'Referral', 'converted', 10, '2026-08-23', 1, '2026-08-22 15:26:32'),
+(8, 1, 1, 'Nour Trust', 'Mohamed Abo-Elmaaty', 'mome.m3aty@gmail.com', '01897444735', 'Referral', 'contacted', 50, '2026-08-23', 1, '2026-08-22 18:50:10'),
+(9, 1, 1, 'Ahmed Salim ', 'Ahmed Salim', 'workahmed372@gmail.com', '+966501234567', 'Website', 'new', 10, '2026-08-29', 1, '2026-08-22 23:58:35'),
+(10, 1, 1, 'Huda Ali Khamis ', 'Huda Ali ', 'huda@gmail.com', '057823890890787', 'Social Media', 'new', 10, '2026-08-31', 1, '2026-08-22 23:59:55');
 
 -- --------------------------------------------------------
 
@@ -301,6 +314,7 @@ INSERT INTO `crm_leads` (`id`, `company_id`, `company_name`, `contact_person`, `
 CREATE TABLE `customers` (
   `id` bigint(20) UNSIGNED NOT NULL,
   `company_id` bigint(20) UNSIGNED NOT NULL DEFAULT 1,
+  `branch_id` int(11) DEFAULT NULL,
   `code` varchar(50) NOT NULL,
   `name_en` varchar(255) NOT NULL,
   `name_ar` varchar(255) NOT NULL,
@@ -319,12 +333,12 @@ CREATE TABLE `customers` (
 -- Dumping data for table `customers`
 --
 
-INSERT INTO `customers` (`id`, `company_id`, `code`, `name_en`, `name_ar`, `email`, `phone`, `type`, `credit_limit`, `balance`, `is_active`, `created_at`, `address`, `tax_number`) VALUES
-(2, 1, 'CUST-41291787403275', 'Mohamed Abo-Elmaaty', 'محمد ابوالمعاطي', 'momo.m3aty@gmail.com', '01124743148', 'B2B', 4000.00, 0.00, 1, '2026-08-22 12:54:35', NULL, NULL),
-(8, 1, 'CUST-61551787404225', 'Mohamed Abo-Elmaaty', 'علاء السيد', 'mo.m3aty@gmail.com', '01275844735', 'B2C', 5000.00, 0.00, 1, '2026-08-22 13:10:25', '', '976465461968456413'),
-(11, 1, 'CUST-1787424543', 'Nour Trust', 'Nour Trust', 'moie.m3aty@gmail.com', '01273844735', 'B2B', 0.00, 0.00, 1, '2026-08-22 18:49:03', NULL, NULL),
-(12, 1, 'Cust-0000211', 'Abdullah Ahmed Abdullraheem ', 'عبدالله أحمد عبدالرحيم ', 'workahmed372@gmail.com', '+966501234567', 'B2B', 1000.00, 0.00, 1, '2026-08-23 00:41:51', 'Makka', 'KSA0987888989'),
-(13, 1, 'CUS - 0009898', 'Khalied Salim Ali Al-barak ', 'خالد سالم علي البراك', 'Khalied@gmail.com', '0535488493', 'B2B', 30000.00, 0.00, 1, '2026-08-23 00:43:38', 'Makka ', 'KSA09090909888');
+INSERT INTO `customers` (`id`, `company_id`, `branch_id`, `code`, `name_en`, `name_ar`, `email`, `phone`, `type`, `credit_limit`, `balance`, `is_active`, `created_at`, `address`, `tax_number`) VALUES
+(2, 1, 1, 'CUST-41291787403275', 'Mohamed Abo-Elmaaty', 'محمد ابوالمعاطي', 'momo.m3aty@gmail.com', '01124743148', 'B2B', 4000.00, 0.00, 1, '2026-08-22 12:54:35', NULL, NULL),
+(8, 1, 1, 'CUST-61551787404225', 'Mohamed Abo-Elmaaty', 'علاء السيد', 'mo.m3aty@gmail.com', '01275844735', 'B2C', 5000.00, 0.00, 1, '2026-08-22 13:10:25', '', '976465461968456413'),
+(11, 1, 1, 'CUST-1787424543', 'Nour Trust', 'Nour Trust', 'moie.m3aty@gmail.com', '01273844735', 'B2B', 0.00, 0.00, 1, '2026-08-22 18:49:03', NULL, NULL),
+(12, 1, 2, 'Cust-0000211', 'Abdullah Ahmed Abdullraheem ', 'عبدالله أحمد عبدالرحيم ', 'workahmed372@gmail.com', '+966501234567', 'B2B', 1000.00, 0.00, 1, '2026-08-23 00:41:51', 'Makka', 'KSA0987888989'),
+(13, 1, 2, 'CUS - 0009898', 'Khalied Salim Ali Al-barak ', 'خالد سالم علي البراك', 'Khalied@gmail.com', '0535488493', 'B2B', 30000.00, 0.00, 1, '2026-08-23 00:43:38', 'Makka ', 'KSA09090909888');
 
 -- --------------------------------------------------------
 
@@ -335,6 +349,7 @@ INSERT INTO `customers` (`id`, `company_id`, `code`, `name_en`, `name_ar`, `emai
 CREATE TABLE `delivery_notes` (
   `id` bigint(20) UNSIGNED NOT NULL,
   `company_id` bigint(20) UNSIGNED DEFAULT 1,
+  `branch_id` int(11) DEFAULT 0,
   `delivery_number` varchar(50) NOT NULL,
   `warehouse_id` bigint(20) UNSIGNED NOT NULL,
   `customer_name` varchar(255) NOT NULL,
@@ -349,9 +364,9 @@ CREATE TABLE `delivery_notes` (
 -- Dumping data for table `delivery_notes`
 --
 
-INSERT INTO `delivery_notes` (`id`, `company_id`, `delivery_number`, `warehouse_id`, `customer_name`, `delivery_date`, `status`, `notes`, `created_at`, `updated_at`) VALUES
-(1, 1, 'DN-26082284', 2, 'محمد ابوالمعاطي', '2026-08-22', 'draft', '', '2026-08-22 23:20:43', '2026-08-22 23:20:43'),
-(2, 1, 'DN-26082319', 2, 'khalid Abdullraheem', '2026-08-23', 'draft', 'as per the term and condition ', '2026-08-23 00:47:57', '2026-08-23 00:47:57');
+INSERT INTO `delivery_notes` (`id`, `company_id`, `branch_id`, `delivery_number`, `warehouse_id`, `customer_name`, `delivery_date`, `status`, `notes`, `created_at`, `updated_at`) VALUES
+(1, 1, 1, 'DN-26082284', 2, 'محمد ابوالمعاطي', '2026-08-22', 'draft', '', '2026-08-22 23:20:43', '2026-09-07 23:01:40'),
+(2, 1, 2, 'DN-26082319', 2, 'khalid Abdullraheem', '2026-08-23', 'draft', 'as per the term and condition ', '2026-08-23 00:47:57', '2026-09-07 23:01:42');
 
 -- --------------------------------------------------------
 
@@ -383,6 +398,10 @@ INSERT INTO `delivery_note_items` (`id`, `delivery_note_id`, `product_id`, `quan
 
 CREATE TABLE `fiscal_periods` (
   `id` bigint(20) UNSIGNED NOT NULL,
+  `company_id` int(11) DEFAULT 1,
+  `branch_id` int(11) DEFAULT 0,
+  `name_ar` varchar(255) NOT NULL,
+  `name_en` varchar(255) DEFAULT NULL,
   `period_name` varchar(100) NOT NULL,
   `fiscal_year_id` bigint(20) UNSIGNED DEFAULT NULL,
   `name` varchar(100) NOT NULL,
@@ -398,9 +417,10 @@ CREATE TABLE `fiscal_periods` (
 -- Dumping data for table `fiscal_periods`
 --
 
-INSERT INTO `fiscal_periods` (`id`, `period_name`, `fiscal_year_id`, `name`, `start_date`, `end_date`, `status`, `closed_at`, `closing_journal_id`, `notes`) VALUES
-(2, 'السنة المالية 2026', NULL, '', '2026-01-01', '2026-06-09', 'closed', '2026-08-23 21:46:04', NULL, ''),
-(3, 'السنة المالية 2026', NULL, '', '2026-06-10', '2026-12-31', 'open', NULL, NULL, '');
+INSERT INTO `fiscal_periods` (`id`, `company_id`, `branch_id`, `name_ar`, `name_en`, `period_name`, `fiscal_year_id`, `name`, `start_date`, `end_date`, `status`, `closed_at`, `closing_journal_id`, `notes`) VALUES
+(2, 1, 1, '', NULL, 'السنة المالية 2026', NULL, '', '2026-01-01', '2026-06-09', 'closed', '2026-08-23 21:46:04', NULL, ''),
+(3, 1, 2, 'Period Name (AR) *', 'Period Name (EN)', 'السنة المالية 2026', NULL, '', '2026-06-10', '2026-12-31', 'open', NULL, NULL, ''),
+(4, 1, 2, 'Period Name (AR) *', 'Period Name (EN)', '', NULL, '', '2026-01-01', '2026-12-31', 'open', NULL, NULL, '');
 
 -- --------------------------------------------------------
 
@@ -473,6 +493,7 @@ CREATE TABLE `fiscal_years` (
 CREATE TABLE `fixed_assets` (
   `id` bigint(20) UNSIGNED NOT NULL,
   `company_id` bigint(20) UNSIGNED DEFAULT 1,
+  `branch_id` int(11) DEFAULT 0,
   `code` varchar(50) NOT NULL,
   `name_ar` varchar(255) NOT NULL,
   `name_en` varchar(255) DEFAULT NULL,
@@ -497,9 +518,9 @@ CREATE TABLE `fixed_assets` (
 -- Dumping data for table `fixed_assets`
 --
 
-INSERT INTO `fixed_assets` (`id`, `company_id`, `code`, `name_ar`, `name_en`, `category`, `purchase_date`, `purchase_cost`, `salvage_value`, `useful_life_years`, `depreciation_method`, `accumulated_depreciation`, `book_value`, `asset_account_id`, `dep_expense_account_id`, `acc_dep_account_id`, `cost_center_id`, `status`, `created_at`, `updated_at`) VALUES
-(1, 1, '07775000', 'محمد ابوالمعاطي', '', 'vehicles', '2026-08-23', 5000.00, 2000.00, 5, 'straight_line', 50.00, 4950.00, 1, 4, 2, 2, 'active', '2026-08-23 20:48:23', '2026-08-23 20:51:44'),
-(2, 1, 'CC-100', 'محمد ابوالمعاطي', '', 'buildings', '2026-08-23', 5000.00, 2000.00, 5, 'straight_line', 0.00, 5000.00, 3, 6, 4, 2, 'active', '2026-08-23 20:51:22', '2026-08-23 20:51:22');
+INSERT INTO `fixed_assets` (`id`, `company_id`, `branch_id`, `code`, `name_ar`, `name_en`, `category`, `purchase_date`, `purchase_cost`, `salvage_value`, `useful_life_years`, `depreciation_method`, `accumulated_depreciation`, `book_value`, `asset_account_id`, `dep_expense_account_id`, `acc_dep_account_id`, `cost_center_id`, `status`, `created_at`, `updated_at`) VALUES
+(1, 1, 1, '07775000', 'محمد ابوالمعاطي', '', 'vehicles', '2026-08-23', 5000.00, 2000.00, 5, 'straight_line', 50.00, 4950.00, 1, 4, 2, 2, 'active', '2026-08-23 20:48:23', '2026-09-07 10:19:36'),
+(2, 1, 1, 'CC-100', 'محمد ابوالمعاطي', '', 'buildings', '2026-08-23', 5000.00, 2000.00, 5, 'straight_line', 0.00, 5000.00, 3, 6, 4, 2, 'active', '2026-08-23 20:51:22', '2026-09-07 10:19:39');
 
 -- --------------------------------------------------------
 
@@ -927,6 +948,7 @@ INSERT INTO `hr_shifts` (`id`, `code`, `name_ar`, `start_time`, `end_time`, `gra
 CREATE TABLE `inv_categories` (
   `id` bigint(20) UNSIGNED NOT NULL,
   `company_id` bigint(20) UNSIGNED NOT NULL DEFAULT 1,
+  `branch_id` int(11) DEFAULT 0,
   `name` varchar(255) NOT NULL,
   `parent_id` bigint(20) UNSIGNED DEFAULT NULL,
   `is_active` tinyint(1) DEFAULT 1,
@@ -937,10 +959,10 @@ CREATE TABLE `inv_categories` (
 -- Dumping data for table `inv_categories`
 --
 
-INSERT INTO `inv_categories` (`id`, `company_id`, `name`, `parent_id`, `is_active`, `created_at`) VALUES
-(1, 1, 'الإلكترونيات والأجهزة (Electronics)', NULL, 1, '2026-08-22 13:39:34'),
-(2, 1, 'الأثاث المكتبي (Office Furniture)', NULL, 1, '2026-08-22 13:39:34'),
-(3, 1, 'الخدمات (Services)', NULL, 1, '2026-08-22 13:39:34');
+INSERT INTO `inv_categories` (`id`, `company_id`, `branch_id`, `name`, `parent_id`, `is_active`, `created_at`) VALUES
+(1, 1, 1, 'الإلكترونيات والأجهزة (Electronics)', NULL, 1, '2026-08-22 13:39:34'),
+(2, 1, 2, 'الأثاث المكتبي (Office Furniture)', NULL, 1, '2026-08-22 13:39:34'),
+(3, 1, 3, 'الخدمات (Services)', NULL, 1, '2026-08-22 13:39:34');
 
 -- --------------------------------------------------------
 
@@ -951,6 +973,7 @@ INSERT INTO `inv_categories` (`id`, `company_id`, `name`, `parent_id`, `is_activ
 CREATE TABLE `inv_delivery_notes` (
   `id` bigint(20) UNSIGNED NOT NULL,
   `company_id` bigint(20) UNSIGNED DEFAULT NULL,
+  `branch_id` int(11) DEFAULT 0,
   `note_no` varchar(50) NOT NULL,
   `warehouse_id` bigint(20) UNSIGNED DEFAULT NULL,
   `order_id` bigint(20) UNSIGNED DEFAULT NULL,
@@ -965,8 +988,8 @@ CREATE TABLE `inv_delivery_notes` (
 -- Dumping data for table `inv_delivery_notes`
 --
 
-INSERT INTO `inv_delivery_notes` (`id`, `company_id`, `note_no`, `warehouse_id`, `order_id`, `customer_id`, `note_date`, `status`, `notes`, `created_at`) VALUES
-(1, 1, 'DN-2026081814', 1, NULL, 2, '2026-08-22', 'draft', 'اضافة راس مال', '2026-08-22 16:15:38');
+INSERT INTO `inv_delivery_notes` (`id`, `company_id`, `branch_id`, `note_no`, `warehouse_id`, `order_id`, `customer_id`, `note_date`, `status`, `notes`, `created_at`) VALUES
+(1, 1, 1, 'DN-2026081814', 1, NULL, 2, '2026-08-22', 'draft', 'اضافة راس مال', '2026-08-22 16:15:38');
 
 -- --------------------------------------------------------
 
@@ -1000,6 +1023,7 @@ INSERT INTO `inv_delivery_note_lines` (`id`, `note_id`, `product_id`, `descripti
 CREATE TABLE `inv_products` (
   `id` bigint(20) UNSIGNED NOT NULL,
   `company_id` bigint(20) UNSIGNED NOT NULL DEFAULT 1,
+  `branch_id` int(11) DEFAULT 0,
   `sku` varchar(100) NOT NULL,
   `barcode` varchar(100) DEFAULT NULL,
   `name_en` varchar(255) NOT NULL,
@@ -1021,13 +1045,13 @@ CREATE TABLE `inv_products` (
 -- Dumping data for table `inv_products`
 --
 
-INSERT INTO `inv_products` (`id`, `company_id`, `sku`, `barcode`, `name_en`, `name_ar`, `category_id`, `type`, `unit`, `cost_price`, `sale_price`, `tax_percent`, `track_batches`, `track_serials`, `reorder_level`, `is_active`, `created_at`) VALUES
-(1, 1, 'PRD-LPT-001', '1234567890123', 'Dell XPS 15 Laptop', 'لابتوب ديل XPS 15', 1, 'storable', 'pcs', 4500.0000, 5800.0000, 15.00, 0, 0, 0.00, 1, '2026-08-22 13:39:34'),
-(2, 1, 'PRD-LPT-002', '1234567890124', 'MacBook Pro 16', 'ماك بوك برو 16 إنش', 1, 'storable', 'pcs', 8500.0000, 10500.0000, 15.00, 0, 0, 0.00, 1, '2026-08-22 13:39:34'),
-(3, 1, 'PRD-FUR-001', '1234567890125', 'Ergonomic Office Chair', 'كرسي مكتب طبي مريح', 2, 'storable', 'pcs', 350.0000, 550.0000, 15.00, 0, 0, 0.00, 1, '2026-08-22 13:39:34'),
-(4, 1, 'PRD-FUR-002', '1234567890126', 'Executive Desk', 'مكتب إداري فاخر', 2, 'storable', 'pcs', 800.0000, 1200.0000, 15.00, 0, 0, 0.00, 1, '2026-08-22 13:39:34'),
-(5, 1, 'PRD-SRV-001', NULL, 'Annual Maintenance Contract', 'عقد صيانة سنوي للأجهزة', 3, 'service', 'contract', 0.0000, 2500.0000, 15.00, 0, 0, 0.00, 1, '2026-08-22 13:39:34'),
-(6, 1, 'PRD-SRV-002', NULL, 'Software Installation Support', 'خدمة تثبيت ودعم البرمجيات', 3, 'service', 'hour', 0.0000, 150.0000, 15.00, 0, 0, 0.00, 1, '2026-08-22 13:39:34');
+INSERT INTO `inv_products` (`id`, `company_id`, `branch_id`, `sku`, `barcode`, `name_en`, `name_ar`, `category_id`, `type`, `unit`, `cost_price`, `sale_price`, `tax_percent`, `track_batches`, `track_serials`, `reorder_level`, `is_active`, `created_at`) VALUES
+(1, 1, 1, 'PRD-LPT-001', '1234567890123', 'Dell XPS 15 Laptop', 'لابتوب ديل XPS 15', 1, 'storable', 'pcs', 4500.0000, 5800.0000, 15.00, 0, 0, 0.00, 1, '2026-08-22 13:39:34'),
+(2, 1, 2, 'PRD-LPT-002', '1234567890124', 'MacBook Pro 16', 'ماك بوك برو 16 إنش', 1, 'storable', 'pcs', 8500.0000, 10500.0000, 15.00, 0, 0, 0.00, 1, '2026-08-22 13:39:34'),
+(3, 1, 3, 'PRD-FUR-001', '1234567890125', 'Ergonomic Office Chair', 'كرسي مكتب طبي مريح', 2, 'storable', 'pcs', 350.0000, 550.0000, 15.00, 0, 0, 0.00, 1, '2026-08-22 13:39:34'),
+(4, 1, 4, 'PRD-FUR-002', '1234567890126', 'Executive Desk', 'مكتب إداري فاخر', 2, 'storable', 'pcs', 800.0000, 1200.0000, 15.00, 0, 0, 0.00, 1, '2026-08-22 13:39:34'),
+(5, 1, 1, 'PRD-SRV-001', NULL, 'Annual Maintenance Contract', 'عقد صيانة سنوي للأجهزة', 3, 'service', 'contract', 0.0000, 2500.0000, 15.00, 0, 0, 0.00, 1, '2026-08-22 13:39:34'),
+(6, 1, 2, 'PRD-SRV-002', NULL, 'Software Installation Support', 'خدمة تثبيت ودعم البرمجيات', 3, 'service', 'hour', 0.0000, 150.0000, 15.00, 0, 0, 0.00, 1, '2026-08-22 13:39:34');
 
 -- --------------------------------------------------------
 
@@ -1037,6 +1061,7 @@ INSERT INTO `inv_products` (`id`, `company_id`, `sku`, `barcode`, `name_en`, `na
 
 CREATE TABLE `inv_stock` (
   `id` bigint(20) UNSIGNED NOT NULL,
+  `branch_id` int(11) DEFAULT 0,
   `product_id` bigint(20) UNSIGNED NOT NULL,
   `warehouse_id` bigint(20) UNSIGNED NOT NULL,
   `quantity` decimal(15,4) DEFAULT 0.0000,
@@ -1051,6 +1076,7 @@ CREATE TABLE `inv_stock` (
 
 CREATE TABLE `inv_stock_movements` (
   `id` bigint(20) UNSIGNED NOT NULL,
+  `branch_id` int(11) DEFAULT 0,
   `product_id` bigint(20) UNSIGNED NOT NULL,
   `warehouse_id` bigint(20) UNSIGNED NOT NULL,
   `type` varchar(50) NOT NULL,
@@ -1067,6 +1093,7 @@ CREATE TABLE `inv_stock_movements` (
 
 CREATE TABLE `inv_stock_transfers` (
   `id` bigint(20) UNSIGNED NOT NULL,
+  `branch_id` int(11) DEFAULT 0,
   `transfer_number` varchar(50) NOT NULL,
   `from_warehouse_id` bigint(20) UNSIGNED NOT NULL,
   `to_warehouse_id` bigint(20) UNSIGNED NOT NULL,
@@ -1096,6 +1123,7 @@ CREATE TABLE `inv_stock_transfer_items` (
 CREATE TABLE `inv_warehouses` (
   `id` bigint(20) UNSIGNED NOT NULL,
   `company_id` bigint(20) UNSIGNED NOT NULL DEFAULT 1,
+  `branch_id` int(11) DEFAULT 0,
   `code` varchar(50) NOT NULL,
   `name_ar` varchar(255) DEFAULT NULL,
   `name_en` varchar(255) DEFAULT NULL,
@@ -1111,12 +1139,12 @@ CREATE TABLE `inv_warehouses` (
 -- Dumping data for table `inv_warehouses`
 --
 
-INSERT INTO `inv_warehouses` (`id`, `company_id`, `code`, `name_ar`, `name_en`, `name`, `location`, `is_active`, `created_at`, `manager_name`, `phone`) VALUES
-(1, 1, 'WH-JED-01', NULL, NULL, 'Jeddah Main Warehouse', 'Jeddah, Al-Nuzha', 1, '2026-08-22 12:53:33', NULL, NULL),
-(2, 1, 'WH-RUH-01', NULL, NULL, 'Riyadh Branch Warehouse', 'Riyadh, Olaya', 1, '2026-08-22 12:53:33', NULL, NULL),
-(3, 1, 'WH-001', NULL, NULL, 'المستودع الرئيسي', 'المبنى الرئيسي - المنطقة الصناعية', 1, '2026-08-22 16:10:18', NULL, NULL),
-(4, 1, 'WH-002', NULL, NULL, 'مستودع المعرض', 'فرع المعرض العام', 1, '2026-08-22 16:10:18', NULL, NULL),
-(5, 1, 'WH-003', NULL, NULL, 'مستودع المرتجعات', 'مبنى الخدمات الملحق', 1, '2026-08-22 16:10:18', NULL, NULL);
+INSERT INTO `inv_warehouses` (`id`, `company_id`, `branch_id`, `code`, `name_ar`, `name_en`, `name`, `location`, `is_active`, `created_at`, `manager_name`, `phone`) VALUES
+(1, 1, 1, 'WH-JED-01', NULL, NULL, 'Jeddah Main Warehouse', 'Jeddah, Al-Nuzha', 1, '2026-08-22 12:53:33', NULL, NULL),
+(2, 1, 2, 'WH-RUH-01', NULL, NULL, 'Riyadh Branch Warehouse', 'Riyadh, Olaya', 1, '2026-08-22 12:53:33', NULL, NULL),
+(3, 1, 3, 'WH-001', NULL, NULL, 'المستودع الرئيسي', 'المبنى الرئيسي - المنطقة الصناعية', 1, '2026-08-22 16:10:18', NULL, NULL),
+(4, 1, 4, 'WH-002', NULL, NULL, 'مستودع المعرض', 'فرع المعرض العام', 1, '2026-08-22 16:10:18', NULL, NULL),
+(5, 1, 1, 'WH-003', NULL, NULL, 'مستودع المرتجعات', 'مبنى الخدمات الملحق', 1, '2026-08-22 16:10:18', NULL, NULL);
 
 -- --------------------------------------------------------
 
@@ -1128,6 +1156,7 @@ CREATE TABLE `journal_entries` (
   `id` bigint(20) UNSIGNED NOT NULL,
   `entry_number` varchar(50) NOT NULL,
   `company_id` bigint(20) UNSIGNED NOT NULL DEFAULT 1,
+  `branch_id` int(11) DEFAULT 0,
   `reference` varchar(100) DEFAULT NULL,
   `entry_date` date NOT NULL,
   `reference_number` varchar(100) DEFAULT NULL,
@@ -1142,11 +1171,11 @@ CREATE TABLE `journal_entries` (
 -- Dumping data for table `journal_entries`
 --
 
-INSERT INTO `journal_entries` (`id`, `entry_number`, `company_id`, `reference`, `entry_date`, `reference_number`, `description`, `status`, `created_by`, `created_at`, `total_amount`) VALUES
-(1, 'JE-26080001', 1, NULL, '2026-08-23', '87846541654165', 'بيان القيد (Description) *', 'draft', NULL, '2026-08-23 20:11:50', 4000.00),
-(2, 'JE-26080002', 1, NULL, '2026-08-23', '56541965165416', 'شرح القيد العام *', 'posted', NULL, '2026-08-23 20:13:14', 600.00),
-(3, 'DEP-260823-811', 1, NULL, '2026-08-23', NULL, 'قيد إهلاك شهري للأصل: محمد ابوالمعاطي (07775000)', 'posted', NULL, '2026-08-23 20:50:46', 50.00),
-(4, 'BNK-FEE-260823-78', 1, NULL, '2026-08-23', NULL, 'مصاريف وعمولات بنكية - كشف تسوية BR-26080001', 'posted', NULL, '2026-08-23 21:10:58', 5000.00);
+INSERT INTO `journal_entries` (`id`, `entry_number`, `company_id`, `branch_id`, `reference`, `entry_date`, `reference_number`, `description`, `status`, `created_by`, `created_at`, `total_amount`) VALUES
+(1, 'JE-26080001', 1, 1, NULL, '2026-08-23', '87846541654165', 'بيان القيد (Description) *', 'draft', NULL, '2026-08-23 20:11:50', 4000.00),
+(2, 'JE-26080002', 1, 2, NULL, '2026-08-23', '56541965165416', 'شرح القيد العام *', 'posted', NULL, '2026-08-23 20:13:14', 600.00),
+(3, 'DEP-260823-811', 1, 1, NULL, '2026-08-23', NULL, 'قيد إهلاك شهري للأصل: محمد ابوالمعاطي (07775000)', 'posted', NULL, '2026-08-23 20:50:46', 50.00),
+(4, 'BNK-FEE-260823-78', 1, 2, NULL, '2026-08-23', NULL, 'مصاريف وعمولات بنكية - كشف تسوية BR-26080001', 'posted', NULL, '2026-08-23 21:10:58', 5000.00);
 
 -- --------------------------------------------------------
 
@@ -1268,6 +1297,7 @@ CREATE TABLE `products` (
   `id` bigint(20) UNSIGNED NOT NULL,
   `category_id` bigint(20) UNSIGNED DEFAULT NULL,
   `company_id` bigint(20) UNSIGNED DEFAULT 1,
+  `branch_id` int(11) DEFAULT 0,
   `item_code` varchar(50) NOT NULL,
   `barcode` varchar(100) DEFAULT NULL,
   `name_ar` varchar(255) NOT NULL,
@@ -1285,12 +1315,13 @@ CREATE TABLE `products` (
 -- Dumping data for table `products`
 --
 
-INSERT INTO `products` (`id`, `category_id`, `company_id`, `item_code`, `barcode`, `name_ar`, `name_en`, `description`, `purchase_price`, `created_at`, `unit`, `selling_price`, `reorder_level`, `is_active`) VALUES
-(1, 1, 1, 'ITM-1001', '', 'لابتوب ديل انسبايرون (Core i7)', 'Dell Inspiron Laptop', '', 25000.00, '2026-08-22 19:59:53', 'قطعة', 0.00, 0.00, 1),
-(2, NULL, 1, 'ITM-1002', NULL, 'ورق طباعة A4 ممتاز 80 جرام', 'A4 Printer Paper 80g', NULL, 180.00, '2026-08-22 19:59:53', 'قطعة', 0.00, 0.00, 1),
-(3, NULL, 1, 'ITM-1003', NULL, 'حبر طابعة أسود HP', 'HP Black Ink Cartridge', NULL, 500.00, '2026-08-22 19:59:53', 'قطعة', 0.00, 0.00, 1),
-(5, NULL, 1, 'ITM-1005', '', 'مكتب خشبي إداري حديث', 'Modern Office Desk', 'وصف وتفاصيل الصنف\r\n', 3500.00, '2026-08-22 19:59:53', 'قطعة', 4000.00, 5.00, 1),
-(6, 1, 1, 'oo112', 'weffaf', 'برنامج سحابي للمحاماه ', 'ERP for  office ', 'wegavasv', 300.00, '2026-08-22 22:54:48', 'قطعة', 2500.00, 0.97, 1);
+INSERT INTO `products` (`id`, `category_id`, `company_id`, `branch_id`, `item_code`, `barcode`, `name_ar`, `name_en`, `description`, `purchase_price`, `created_at`, `unit`, `selling_price`, `reorder_level`, `is_active`) VALUES
+(1, 1, 1, 1, 'ITM-1001', '', 'لابتوب ديل انسبايرون (Core i7)', 'Dell Inspiron Laptop', '', 25000.00, '2026-08-22 19:59:53', 'قطعة', 0.00, 0.00, 1),
+(2, NULL, 1, 2, 'ITM-1002', NULL, 'ورق طباعة A4 ممتاز 80 جرام', 'A4 Printer Paper 80g', NULL, 180.00, '2026-08-22 19:59:53', 'قطعة', 0.00, 0.00, 1),
+(3, NULL, 1, 3, 'ITM-1003', NULL, 'حبر طابعة أسود HP', 'HP Black Ink Cartridge', NULL, 500.00, '2026-08-22 19:59:53', 'قطعة', 0.00, 0.00, 1),
+(5, NULL, 1, 4, 'ITM-1005', '', 'مكتب خشبي إداري حديث', 'Modern Office Desk', 'وصف وتفاصيل الصنف\r\n', 3500.00, '2026-08-22 19:59:53', 'قطعة', 4000.00, 5.00, 1),
+(6, 1, 1, 1, 'oo112', 'weffaf', 'برنامج سحابي للمحاماه ', 'ERP for  office ', 'wegavasv', 300.00, '2026-08-22 22:54:48', 'قطعة', 2500.00, 0.97, 1),
+(7, 1, 1, 0, 'ITM-26110', 'الباركود الدولي (Barcode)', 'Product Name (Arabic) *', 'Product Name (English)', 'Product Description\r\n', 80.00, '2026-09-07 23:12:50', 'قطعة', 50.00, 70.00, 0);
 
 -- --------------------------------------------------------
 
@@ -1301,6 +1332,7 @@ INSERT INTO `products` (`id`, `category_id`, `company_id`, `item_code`, `barcode
 CREATE TABLE `product_categories` (
   `id` bigint(20) UNSIGNED NOT NULL,
   `company_id` bigint(20) UNSIGNED DEFAULT 1,
+  `branch_id` int(11) DEFAULT 0,
   `name_ar` varchar(255) NOT NULL,
   `name_en` varchar(255) DEFAULT NULL,
   `description` text DEFAULT NULL
@@ -1310,8 +1342,8 @@ CREATE TABLE `product_categories` (
 -- Dumping data for table `product_categories`
 --
 
-INSERT INTO `product_categories` (`id`, `company_id`, `name_ar`, `name_en`, `description`) VALUES
-(1, 1, 'أجهزة الكترونيه ', 'Electronics', '');
+INSERT INTO `product_categories` (`id`, `company_id`, `branch_id`, `name_ar`, `name_en`, `description`) VALUES
+(1, 1, 1, 'أجهزة الكترونيه ', 'Electronics', '');
 
 -- --------------------------------------------------------
 
@@ -1335,15 +1367,17 @@ CREATE TABLE `projects` (
   `description` text DEFAULT NULL,
   `created_by` bigint(20) UNSIGNED DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT current_timestamp(),
-  `updated_at` timestamp NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+  `updated_at` timestamp NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `company_id` int(11) DEFAULT 1,
+  `branch_id` int(11) DEFAULT 0
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
 -- Dumping data for table `projects`
 --
 
-INSERT INTO `projects` (`id`, `code`, `name_ar`, `name_en`, `customer_id`, `contract_value`, `estimated_budget`, `spent_amount`, `progress_percent`, `start_date`, `end_date`, `status`, `description`, `created_by`, `created_at`, `updated_at`) VALUES
-(1, 'PRJ-2026-0001', 'اسم المشروع (عربي) *', 'اسم المشروع (إنجليزي)', 13, 50000.00, 15000.00, 8000.00, 20.00, '2026-08-26', '2026-09-30', 'in_progress', 'نطاق العمل والوصف التفصيلي', 1, '2026-08-26 19:36:46', '2026-08-26 20:04:30');
+INSERT INTO `projects` (`id`, `code`, `name_ar`, `name_en`, `customer_id`, `contract_value`, `estimated_budget`, `spent_amount`, `progress_percent`, `start_date`, `end_date`, `status`, `description`, `created_by`, `created_at`, `updated_at`, `company_id`, `branch_id`) VALUES
+(1, 'PRJ-2026-0001', 'اسم المشروع (عربي) *', 'اسم المشروع (إنجليزي)', 13, 50000.00, 15000.00, 8000.00, 20.00, '2026-08-26', '2026-09-30', 'in_progress', 'نطاق العمل والوصف التفصيلي', 1, '2026-08-26 19:36:46', '2026-09-03 10:54:02', 1, 1);
 
 -- --------------------------------------------------------
 
@@ -1370,15 +1404,17 @@ CREATE TABLE `project_contracts` (
   `notes` text DEFAULT NULL,
   `created_by` bigint(20) UNSIGNED DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT current_timestamp(),
-  `updated_at` timestamp NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+  `updated_at` timestamp NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `company_id` int(11) DEFAULT 1,
+  `branch_id` int(11) DEFAULT 0
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
 -- Dumping data for table `project_contracts`
 --
 
-INSERT INTO `project_contracts` (`id`, `contract_number`, `project_id`, `customer_id`, `title_ar`, `title_en`, `contract_type`, `contract_value`, `advance_payment_amount`, `retention_percent`, `start_date`, `end_date`, `sign_date`, `status`, `terms_and_conditions`, `notes`, `created_by`, `created_at`, `updated_at`) VALUES
-(1, 'CON-PRJ-2026-0001', 1, 13, 'عنوان العقد (عربي) *', 'عنوان العقد (إنجليزي)', 'owner_contract', 8000.00, 2000.00, 10.00, '2026-08-26', '2027-08-26', '2026-08-26', 'under_renewal', 'الشروط والبنود الالتزامية للعقد', 'ملاحظات إضافية', 1, '2026-08-26 20:06:43', '2026-08-26 20:06:43');
+INSERT INTO `project_contracts` (`id`, `contract_number`, `project_id`, `customer_id`, `title_ar`, `title_en`, `contract_type`, `contract_value`, `advance_payment_amount`, `retention_percent`, `start_date`, `end_date`, `sign_date`, `status`, `terms_and_conditions`, `notes`, `created_by`, `created_at`, `updated_at`, `company_id`, `branch_id`) VALUES
+(1, 'CON-PRJ-2026-0001', 1, 13, 'عنوان العقد (عربي) *', 'عنوان العقد (إنجليزي)', 'owner_contract', 8000.00, 2000.00, 10.00, '2026-08-26', '2027-08-26', '2026-08-26', 'under_renewal', 'الشروط والبنود الالتزامية للعقد', 'ملاحظات إضافية', 1, '2026-08-26 20:06:43', '2026-09-03 10:54:41', 1, 1);
 
 -- --------------------------------------------------------
 
@@ -1388,6 +1424,8 @@ INSERT INTO `project_contracts` (`id`, `contract_number`, `project_id`, `custome
 
 CREATE TABLE `project_costs` (
   `id` bigint(20) UNSIGNED NOT NULL,
+  `company_id` int(11) DEFAULT 1,
+  `branch_id` int(11) DEFAULT 0,
   `voucher_number` varchar(100) NOT NULL,
   `project_id` bigint(20) UNSIGNED NOT NULL,
   `cost_category` enum('materials','labor','equipment','subcontractor','overhead','other') NOT NULL DEFAULT 'materials',
@@ -1408,8 +1446,8 @@ CREATE TABLE `project_costs` (
 -- Dumping data for table `project_costs`
 --
 
-INSERT INTO `project_costs` (`id`, `voucher_number`, `project_id`, `cost_category`, `cost_date`, `amount`, `supplier_id`, `account_id`, `reference_no`, `payment_status`, `description`, `notes`, `created_by`, `created_at`, `updated_at`) VALUES
-(1, 'COST-PRJ-2026-0001', 1, 'materials', '2026-08-26', 8000.00, 1, 2, '6453163164165', 'partially_paid', 'البيان والوصف التفصيلي', 'ملاحظات إضافية', 1, '2026-08-26 20:04:30', '2026-08-26 20:04:30');
+INSERT INTO `project_costs` (`id`, `company_id`, `branch_id`, `voucher_number`, `project_id`, `cost_category`, `cost_date`, `amount`, `supplier_id`, `account_id`, `reference_no`, `payment_status`, `description`, `notes`, `created_by`, `created_at`, `updated_at`) VALUES
+(1, 1, 1, 'COST-PRJ-2026-0001', 1, 'materials', '2026-08-26', 8000.00, 1, 2, '6453163164165', 'partially_paid', 'البيان والوصف التفصيلي', 'ملاحظات إضافية', 1, '2026-08-26 20:04:30', '2026-09-03 10:54:49');
 
 -- --------------------------------------------------------
 
@@ -1419,6 +1457,8 @@ INSERT INTO `project_costs` (`id`, `voucher_number`, `project_id`, `cost_categor
 
 CREATE TABLE `project_invoices` (
   `id` bigint(20) UNSIGNED NOT NULL,
+  `company_id` int(11) DEFAULT 1,
+  `branch_id` int(11) DEFAULT 0,
   `invoice_number` varchar(100) NOT NULL,
   `project_id` bigint(20) UNSIGNED NOT NULL,
   `customer_id` bigint(20) UNSIGNED DEFAULT NULL,
@@ -1444,8 +1484,8 @@ CREATE TABLE `project_invoices` (
 -- Dumping data for table `project_invoices`
 --
 
-INSERT INTO `project_invoices` (`id`, `invoice_number`, `project_id`, `customer_id`, `invoice_date`, `due_date`, `period_start`, `period_end`, `invoice_type`, `total_amount`, `deductions_amount`, `tax_amount`, `net_amount`, `paid_amount`, `status`, `description`, `notes`, `created_by`, `created_at`, `updated_at`) VALUES
-(1, 'INV-PRJ-2026-0001', 1, 12, '2026-08-26', '2026-09-10', '2026-08-01', '2026-08-31', 'advance_payment', 8000.00, 1500.00, 2500.00, 9000.00, 9000.00, 'paid', 'وصف ونطاق المستخلص', 'شروط وملاحظات السداد', 1, '2026-08-26 19:55:45', '2026-08-26 19:56:23');
+INSERT INTO `project_invoices` (`id`, `company_id`, `branch_id`, `invoice_number`, `project_id`, `customer_id`, `invoice_date`, `due_date`, `period_start`, `period_end`, `invoice_type`, `total_amount`, `deductions_amount`, `tax_amount`, `net_amount`, `paid_amount`, `status`, `description`, `notes`, `created_by`, `created_at`, `updated_at`) VALUES
+(1, 1, 1, 'INV-PRJ-2026-0001', 1, 12, '2026-08-26', '2026-09-10', '2026-08-01', '2026-08-31', 'advance_payment', 8000.00, 1500.00, 2500.00, 9000.00, 9000.00, 'paid', 'وصف ونطاق المستخلص', 'شروط وملاحظات السداد', 1, '2026-08-26 19:55:45', '2026-09-03 10:54:54');
 
 -- --------------------------------------------------------
 
@@ -1455,6 +1495,8 @@ INSERT INTO `project_invoices` (`id`, `invoice_number`, `project_id`, `customer_
 
 CREATE TABLE `project_milestones` (
   `id` bigint(20) UNSIGNED NOT NULL,
+  `company_id` int(11) DEFAULT 1,
+  `branch_id` int(11) DEFAULT 0,
   `project_id` bigint(20) UNSIGNED NOT NULL,
   `milestone_code` varchar(100) NOT NULL,
   `title_ar` varchar(255) NOT NULL,
@@ -1478,8 +1520,8 @@ CREATE TABLE `project_milestones` (
 -- Dumping data for table `project_milestones`
 --
 
-INSERT INTO `project_milestones` (`id`, `project_id`, `milestone_code`, `title_ar`, `title_en`, `assigned_to`, `start_date`, `due_date`, `completion_date`, `progress_percent`, `estimated_cost`, `actual_cost`, `status`, `priority`, `description`, `created_by`, `created_at`, `updated_at`) VALUES
-(1, 1, 'MS-2026-0001', 'عنوان المرحلة/المهمة (عربي) *', 'عنوان المرحلة/المهمة (إنجليزي)', 'المهندس / المسؤول الفني عن التنفيذ', '2026-08-26', '2026-09-25', '2026-08-28', 30.00, 5000.00, 3000.00, 'in_progress', 'high', 'تفاصيل والمواصفات الفنية للمرحلة', 1, '2026-08-26 19:45:19', '2026-08-26 19:45:19');
+INSERT INTO `project_milestones` (`id`, `company_id`, `branch_id`, `project_id`, `milestone_code`, `title_ar`, `title_en`, `assigned_to`, `start_date`, `due_date`, `completion_date`, `progress_percent`, `estimated_cost`, `actual_cost`, `status`, `priority`, `description`, `created_by`, `created_at`, `updated_at`) VALUES
+(1, 1, 1, 1, 'MS-2026-0001', 'عنوان المرحلة/المهمة (عربي) *', 'عنوان المرحلة/المهمة (إنجليزي)', 'المهندس / المسؤول الفني عن التنفيذ', '2026-08-26', '2026-09-25', '2026-08-28', 30.00, 5000.00, 3000.00, 'in_progress', 'high', 'تفاصيل والمواصفات الفنية للمرحلة', 1, '2026-08-26 19:45:19', '2026-09-03 10:55:01');
 
 -- --------------------------------------------------------
 
@@ -1508,7 +1550,6 @@ CREATE TABLE `purchase_contracts` (
 --
 
 INSERT INTO `purchase_contracts` (`id`, `company_id`, `supplier_id`, `contract_number`, `title`, `start_date`, `end_date`, `total_value`, `status`, `terms_conditions`, `notes`, `created_at`, `updated_at`) VALUES
-(1, 1, 1, 'PCNT-2608592', 'عنوان العقد / الموضوع *', '2026-08-22', '2027-08-22', 8000.00, 'active', 'الشروط والأحكام\r\n', 'ملاحظات داخلية (لا تظهر في الطباعة)\r\n', '2026-08-22 19:53:41', '2026-08-22 19:53:41'),
 (2, 1, 1, 'PCNT-2608370', 'cabling and fitting in the site number (1919) Gala Oman ', '2026-08-26', '2027-12-03', 105000.00, 'active', 'Certainly. Below is a professional **Contract Terms & Conditions for Electrical Fitting and Cabling Works** between **Nour Makha International** and **Al-Hajri Electricity Company**. It is structured so it can be converted into a formal agreement and adapted to the specific project.\r\n\r\n# ELECTRICAL FITTING & CABLING WORKS AGREEMENT\r\n\r\n**Between**\r\n\r\n**Nour Makha International**\r\nHereinafter referred to as the **“Client”**\r\n\r\n**And**\r\n\r\n**Al-Hajri Electricity Company**\r\nHereinafter referred to as the **“Contractor”**\r\n\r\nCollectively referred to as the **“Parties.”**\r\n\r\n**Project:** [Project Name]\r\n**Project Location:** [Location]\r\n**Contract No.:** [●]\r\n**Contract Date:** [●]\r\n\r\n---\r\n\r\n## 1. Purpose of the Agreement\r\n\r\nThe Client appoints the Contractor to carry out **electrical fitting, installation, cabling, termination, testing, commissioning, and related electrical works** for the Project in accordance with the approved drawings, specifications, applicable standards, and instructions issued by the Client or its authorized representative.\r\n\r\nThe Contractor agrees to perform the Works professionally, safely, and within the agreed project schedule.\r\n\r\n---\r\n\r\n## 2. Scope of Work\r\n\r\nThe Contractor\'s scope shall include, where applicable:\r\n\r\n1. Electrical cable installation and routing.\r\n2. Cable pulling, laying, dressing, tagging, and identification.\r\n3. Installation of cable trays, trunking, conduits, supports, and accessories.\r\n4. Electrical fitting and installation of switches, sockets, lighting fixtures, distribution boards, panels, isolators, and related equipment.\r\n5. Cable termination and gland installation.\r\n6. Installation of cable lugs, ferrules, labels, and identification systems.\r\n7. Earthing and bonding works.\r\n8. Connection of electrical equipment and systems.\r\n9. Testing and inspection of installed cables and electrical equipment.\r\n10. Continuity, insulation resistance, polarity, earth continuity, and other applicable electrical tests.\r\n11. Rectification of defective or non-compliant work.\r\n12. Commissioning and functional testing.\r\n13. Submission of test reports and completion documentation.\r\n14. Removal of work-related waste and maintaining the work area in a clean and safe condition.\r\n15. Any other works specifically identified in the approved **Bill of Quantities (BOQ), drawings, specifications, or quotation**.\r\n\r\n---\r\n\r\n## 3. Approved Drawings and Specifications\r\n\r\nThe Contractor shall execute the Works strictly in accordance with:\r\n\r\n* Approved drawings.\r\n* Technical specifications.\r\n* BOQ.\r\n* Approved material submittals.\r\n* Applicable electrical codes and standards.\r\n* Manufacturer\'s installation instructions.\r\n* Written instructions issued by the Client or Project Consultant.\r\n\r\nNo material deviation from the approved drawings or specifications shall be permitted without prior written approval from the Client.\r\n\r\n---\r\n\r\n## 4. Materials and Equipment\r\n\r\nUnless otherwise agreed in writing:\r\n\r\n* All materials supplied by the Contractor shall be **new, unused, genuine, and of approved quality**.\r\n* Materials shall comply with the required technical specifications and applicable standards.\r\n* The Contractor shall submit material specifications, technical datasheets, certificates, and samples when requested.\r\n* The Client has the right to reject materials that do not comply with the approved specifications.\r\n* Any rejected materials shall be removed from the Project site at the Contractor\'s cost.\r\n\r\n---\r\n\r\n## 5. Workmanship\r\n\r\nThe Contractor shall ensure that all Works are carried out by **qualified, competent, and suitably experienced electricians and technicians**.\r\n\r\nAll installation works shall be neat, properly supported, correctly terminated, adequately labelled, and suitable for safe long-term operation.\r\n\r\nThe Contractor shall be responsible for correcting any defective workmanship identified during the Works or during the warranty period.\r\n\r\n---\r\n\r\n## 6. Health, Safety and Environment\r\n\r\nThe Contractor shall comply with all applicable health, safety, environmental, and site requirements.\r\n\r\nThe Contractor shall:\r\n\r\n* Provide appropriate PPE to all workers.\r\n* Maintain safe working practices.\r\n* Ensure electrical isolation and lock-out/tag-out procedures where applicable.\r\n* Prevent unauthorized access to work areas.\r\n* Maintain appropriate fire and emergency precautions.\r\n* Comply with site safety procedures.\r\n* Immediately report accidents, incidents, electrical hazards, or property damage to the Client.\r\n\r\nAny violation of safety requirements may result in suspension of the relevant Works until the issue is rectified.\r\n\r\n---\r\n\r\n## 7. Permits and Approvals\r\n\r\nThe Contractor shall obtain and maintain all permits, licenses, certifications, inspections, and approvals required for the execution of its scope, to the extent that such obligations are allocated to the Contractor under applicable law or the Project requirements.\r\n\r\nThe Contractor shall cooperate with the Client in obtaining any approvals that require the Client\'s participation.\r\n\r\n---\r\n\r\n## 8. Project Schedule\r\n\r\nThe Contractor shall commence the Works on:\r\n\r\n**Commencement Date:** [●]\r\n\r\nand shall substantially complete the Works by:\r\n\r\n**Completion Date:** [●]\r\n\r\nThe Contractor shall provide sufficient manpower, tools, equipment, and supervision to meet the agreed schedule.\r\n\r\nAny anticipated delay shall be notified to the Client in writing immediately, together with the reason and proposed recovery plan.\r\n\r\n---\r\n\r\n## 9. Contract Price\r\n\r\nThe total contract value shall be:\r\n\r\n**Contract Price: [Currency] [Amount]**\r\n\r\nThe price shall be based on the agreed quotation/BOQ attached to this Agreement.\r\n\r\nUnless specifically stated otherwise, the Contract Price shall include:\r\n\r\n* Labour.\r\n* Installation.\r\n* Tools and equipment.\r\n* Transportation related to the Contractor\'s scope.\r\n* Consumables.\r\n* Testing.\r\n* Commissioning.\r\n* Supervision.\r\n* Site housekeeping.\r\n* All other costs necessary to complete the Contractor\'s scope.\r\n\r\n**VAT or other applicable taxes:** [Included / Excluded / As applicable].\r\n\r\n---\r\n\r\n## 10. Payment Terms\r\n\r\nA suggested payment structure is:\r\n\r\n* **20% advance payment** upon signing of the Agreement and submission of the required documents.\r\n* **40%** upon substantial completion of installation works.\r\n* **30%** upon testing, commissioning, and successful inspection.\r\n* **10% retention** upon final handover and submission of all required documentation.\r\n\r\nThe Parties may agree to alternative payment milestones in the attached payment schedule.\r\n\r\nPayment shall be made within **[15/30] days** following receipt and approval of the Contractor\'s valid invoice and supporting documents.\r\n\r\n---\r\n\r\n## 11. Retention\r\n\r\nThe Client may retain **10% of the Contract Price** as retention until completion of the Works and satisfaction of the applicable warranty/defects obligations.\r\n\r\nThe retention shall be released according to the agreed payment schedule or after expiry of the defects liability period, subject to satisfactory completion of all outstanding obligations.\r\n\r\n---\r\n\r\n## 12. Variation / Additional Works\r\n\r\nNo additional work, change in specification, quantity increase, or variation shall be carried out on a chargeable basis without a **written Variation Order** approved by the Client.\r\n\r\nEach variation should clearly state:\r\n\r\n* Description of the additional/change work.\r\n* Additional or reduced cost.\r\n* Effect on completion date.\r\n* Required materials.\r\n* Approval by authorized representatives of both Parties.\r\n\r\nVerbal instructions shall not automatically constitute approval for additional payment.\r\n\r\n---\r\n\r\n## 13. Inspection and Testing\r\n\r\nThe Client or its authorized representative shall have the right to inspect the Works at any reasonable time.\r\n\r\nThe Contractor shall conduct all required testing, including where applicable:\r\n\r\n* Insulation resistance testing.\r\n* Continuity testing.\r\n* Earth resistance testing.\r\n* Polarity testing.\r\n* Phase sequence testing.\r\n* Cable testing.\r\n* Functional testing.\r\n* Load testing where required.\r\n* Panel and equipment testing.\r\n\r\nThe Contractor shall provide signed test reports upon request.\r\n\r\n---\r\n\r\n## 14. Defects and Rectification\r\n\r\nIf any defect, faulty installation, incorrect termination, damaged cable, or non-compliant work is identified, the Contractor shall rectify the defect at its own cost.\r\n\r\nWhere the defect results from the Contractor\'s workmanship or supplied materials, the Contractor shall bear all reasonable costs associated with rectification, including labour, replacement materials, testing, and re-commissioning.\r\n\r\n---\r\n\r\n## 15. Warranty / Defects Liability Period\r\n\r\nThe Contractor shall provide a **[12]-month defects liability/warranty period** commencing from the date of final acceptance of the Works.\r\n\r\nDuring this period, the Contractor shall correct defects attributable to its workmanship or supplied materials without additional cost to the Client.\r\n\r\nThe warranty shall not apply to defects resulting from misuse, unauthorized modification, normal wear and tear, or causes outside the Contractor\'s responsibility.\r\n\r\n---\r\n\r\n## 16. Protection of Existing Property\r\n\r\nThe Contractor shall take reasonable precautions to protect:\r\n\r\n* Existing electrical installations.\r\n* Buildings and structures.\r\n* Equipment.\r\n* Cables and utilities.\r\n* Client property.\r\n* Third-party property.\r\n\r\nAny damage caused by the Contractor, its employees, subcontractors, or representatives due to negligence or improper work shall be repaired or compensated by the Contractor.\r\n\r\n---\r\n\r\n## 17. Personnel and Subcontracting\r\n\r\nThe Contractor shall be responsible for the conduct and competence of its employees.\r\n\r\nThe Contractor shall not subcontract a substantial part of the Works without the Client\'s prior written approval.\r\n\r\nApproval of a subcontractor shall not relieve the Contractor of any responsibility under this Agreement.\r\n\r\n---\r\n\r\n## 18. Tools and Equipment\r\n\r\nUnless otherwise specified in the BOQ, the Contractor shall provide all tools, equipment, testing instruments, ladders, access equipment, PPE, and other resources required to perform its scope.\r\n\r\nAll testing equipment shall be properly calibrated where applicable.\r\n\r\n---\r\n\r\n## 19. Site Coordination\r\n\r\nThe Contractor shall coordinate its activities with the Client, other contractors, consultants, and site management to avoid interference with other works.\r\n\r\nThe Contractor shall attend coordination meetings when requested.\r\n\r\n---\r\n\r\n## 20. Confidentiality\r\n\r\nBoth Parties shall keep confidential all commercial, technical, financial, project, customer, and business information received from the other Party.\r\n\r\nNeither Party shall disclose confidential information to third parties except where required by law or necessary for execution of the Project.\r\n\r\n---\r\n\r\n## 21. Insurance\r\n\r\nThe Contractor shall maintain appropriate insurance coverage required by applicable law and the Project, including where applicable:\r\n\r\n* Workers\' compensation/employer liability.\r\n* Public liability.\r\n* Vehicle insurance.\r\n* Contractor\'s equipment insurance.\r\n* Professional liability where applicable.\r\n\r\nEvidence of insurance shall be provided upon request.\r\n\r\n---\r\n\r\n## 22. Indemnity\r\n\r\nThe Contractor shall be responsible for claims, losses, damages, or expenses arising from its negligence, misconduct, breach of contract, or failure to comply with applicable safety requirements, to the extent permitted by applicable law.\r\n\r\n---\r\n\r\n## 23. Delay and Liquidated Damages\r\n\r\nIf the Contractor fails to complete the Works within the agreed completion period due to causes attributable to the Contractor, the Parties may agree on liquidated damages of:\r\n\r\n**[●]% of the Contract Price per day/week**, subject to a maximum of **[●]%** of the Contract Price.\r\n\r\nLiquidated damages shall not apply where the delay results from approved variations, force majeure, Client-caused delays, or other circumstances agreed in writing.\r\n\r\n---\r\n\r\n## 24. Suspension of Works\r\n\r\nThe Client may instruct the Contractor to temporarily suspend the Works where necessary due to:\r\n\r\n* Safety concerns.\r\n* Non-compliance with specifications.\r\n* Quality problems.\r\n* Site conditions.\r\n* Coordination requirements.\r\n* Failure to follow contractual instructions.\r\n\r\nThe Contractor shall promptly remedy the reason for suspension.\r\n\r\n---\r\n\r\n## 25. Termination\r\n\r\nEither Party may terminate this Agreement in accordance with applicable law where the other Party materially breaches the Agreement and fails to remedy the breach within **[7/14] days** after receiving written notice.\r\n\r\nThe Client may also terminate the Agreement where the Contractor:\r\n\r\n* Abandons the Works.\r\n* Repeatedly fails to meet quality requirements.\r\n* Seriously breaches safety requirements.\r\n* Fails to maintain adequate manpower.\r\n* Becomes insolvent or ceases business operations.\r\n\r\nUpon termination, the Contractor shall hand over all completed Works, drawings, test reports, materials belonging to the Client, and relevant project documentation.\r\n\r\n---\r\n\r\n## 26. Force Majeure\r\n\r\nNeither Party shall be liable for failure or delay caused by circumstances beyond its reasonable control, including natural disasters, war, government restrictions, major public emergencies, or other events legally recognized as force majeure.\r\n\r\nThe affected Party shall notify the other Party as soon as reasonably possible.\r\n\r\n---\r\n\r\n## 27. Dispute Resolution\r\n\r\nThe Parties shall initially attempt to resolve any dispute through **good-faith negotiation between their authorized representatives**.\r\n\r\nIf the dispute cannot be resolved amicably within **30 days**, the matter may be referred to the competent courts or agreed arbitration mechanism in the jurisdiction specified in this Agreement.\r\n\r\n---\r\n\r\n## 28. Governing Law\r\n\r\nThis Agreement shall be governed by and interpreted in accordance with the **laws of the Sultanate of Oman**, unless the Parties expressly agree otherwise in writing.\r\n\r\n---\r\n\r\n## 29. Entire Agreement\r\n\r\nThis Agreement, together with its schedules, approved quotation, BOQ, drawings, specifications, and approved variation orders, constitutes the entire agreement between the Parties concerning the Works.\r\n\r\nAny amendment shall be valid only if made in writing and signed by authorized representatives of both Parties.\r\n\r\n---\r\n\r\n# 30. Documents Forming Part of the Contract\r\n\r\nThe following documents shall form an integral part of this Agreement:\r\n\r\n1. This Contract Agreement.\r\n2. Contractor\'s quotation.\r\n3. Bill of Quantities (BOQ).\r\n4. Scope of Work.\r\n5. Approved electrical drawings.\r\n6. Technical specifications.\r\n7. Project schedule.\r\n8. Payment schedule.\r\n9. Material approval documents.\r\n10. Approved Variation Orders.\r\n11. Testing and commissioning requirements.\r\n\r\n---\r\n\r\n# SIGNATURES\r\n\r\n### For Nour Makha International\r\n\r\n**Client**\r\n\r\nName: __________________________\r\nPosition: _______________________\r\nSignature: ______________________\r\nDate: __________________________\r\nCompany Stamp:\r\n\r\n### For Al-Hajri Electricity Company\r\n\r\n**Contractor**\r\n\r\nName: __________________________\r\nPosition: _______________________\r\nSignature: ______________________\r\nDate: __________________________\r\nCompany Stamp:\r\n\r\n---\r\n\r\n### Recommended additional clauses\r\n\r\nFor a **professional commercial contract**, I would particularly recommend adding a detailed **BOQ and payment milestone schedule**, and specifying exactly **who supplies the cables, panels, fittings, conduits, cable trays, glands and accessories**. This avoids one of the most common disputes in electrical contracts—whether a material or installation item is included in the quoted price.\r\n\r\n', '', '2026-08-26 08:39:37', '2026-08-26 08:39:37');
 
 -- --------------------------------------------------------
@@ -1785,7 +1826,7 @@ CREATE TABLE `rfqs` (
 --
 
 INSERT INTO `rfqs` (`id`, `company_id`, `rfq_number`, `title`, `request_date`, `deadline_date`, `status`, `notes`, `created_at`, `updated_at`) VALUES
-(1, 1, 'RFQ-260822-89', 'طلب تسعير أجهزة كمبيوتر ', '2026-08-22', '2026-08-29', 'draft', '', '2026-08-22 20:25:49', '2026-08-22 20:25:49');
+(1, 1, 'RFQ-260822-89', 'طلب تسعير أجهزة كمبيوتر ', '2026-08-22', '2026-08-29', 'closed', '', '2026-08-22 20:25:49', '2026-09-01 11:51:39');
 
 -- --------------------------------------------------------
 
@@ -1806,7 +1847,7 @@ CREATE TABLE `rfq_items` (
 --
 
 INSERT INTO `rfq_items` (`id`, `rfq_id`, `product_id`, `description`, `quantity`) VALUES
-(1, 1, 3, 'حبر طابعه ', 50.00);
+(2, 1, 3, 'حبر طابعه ', 50.00);
 
 -- --------------------------------------------------------
 
@@ -1826,7 +1867,7 @@ CREATE TABLE `rfq_suppliers` (
 --
 
 INSERT INTO `rfq_suppliers` (`id`, `rfq_id`, `supplier_id`, `is_awarded`) VALUES
-(1, 1, 1, 0);
+(2, 1, 1, 0);
 
 -- --------------------------------------------------------
 
@@ -2132,6 +2173,7 @@ INSERT INTO `sales_contracts` (`id`, `company_id`, `customer_id`, `contract_numb
 CREATE TABLE `sales_invoices` (
   `id` bigint(20) UNSIGNED NOT NULL,
   `company_id` bigint(20) UNSIGNED NOT NULL DEFAULT 1,
+  `branch_id` int(11) DEFAULT NULL,
   `invoice_number` varchar(50) NOT NULL,
   `customer_id` bigint(20) UNSIGNED NOT NULL,
   `issue_date` date NOT NULL,
@@ -2149,9 +2191,9 @@ CREATE TABLE `sales_invoices` (
 -- Dumping data for table `sales_invoices`
 --
 
-INSERT INTO `sales_invoices` (`id`, `company_id`, `invoice_number`, `customer_id`, `issue_date`, `due_date`, `subtotal`, `tax_amount`, `total_amount`, `paid_amount`, `status`, `notes`, `created_at`) VALUES
-(1, 1, 'INV-2026087928', 2, '2026-08-22', '2026-09-06', 21550.00, 3232.50, 24782.50, 24170.00, 'partially_paid', '', '2026-08-22 16:32:49'),
-(2, 1, 'INV-2026087030', 12, '2026-08-23', '2026-09-07', 6100.00, 915.00, 7015.00, 0.00, 'partially_paid', 'as per the term and condition ', '2026-08-23 00:49:26');
+INSERT INTO `sales_invoices` (`id`, `company_id`, `branch_id`, `invoice_number`, `customer_id`, `issue_date`, `due_date`, `subtotal`, `tax_amount`, `total_amount`, `paid_amount`, `status`, `notes`, `created_at`) VALUES
+(1, 1, NULL, 'INV-2026087928', 2, '2026-08-22', '2026-09-06', 21550.00, 3232.50, 24782.50, 24170.00, 'partially_paid', '', '2026-08-22 16:32:49'),
+(2, 1, NULL, 'INV-2026087030', 12, '2026-08-23', '2026-09-07', 6100.00, 915.00, 7015.00, 0.00, 'partially_paid', 'as per the term and condition ', '2026-08-23 00:49:26');
 
 -- --------------------------------------------------------
 
@@ -2271,6 +2313,7 @@ INSERT INTO `sales_order_lines` (`id`, `order_id`, `product_id`, `description`, 
 CREATE TABLE `sales_price_lists` (
   `id` bigint(20) UNSIGNED NOT NULL,
   `company_id` bigint(20) UNSIGNED DEFAULT 1,
+  `branch_id` int(11) DEFAULT NULL,
   `code` varchar(50) NOT NULL,
   `name_ar` varchar(255) NOT NULL,
   `name_en` varchar(255) DEFAULT NULL,
@@ -2285,8 +2328,8 @@ CREATE TABLE `sales_price_lists` (
 -- Dumping data for table `sales_price_lists`
 --
 
-INSERT INTO `sales_price_lists` (`id`, `company_id`, `code`, `name_ar`, `name_en`, `currency`, `is_active`, `notes`, `created_at`, `updated_at`) VALUES
-(1, 1, 'PL-147', 'اسم القائمة (عربي) *', 'اسم القائمة (إنجليزي)', 'EGP', 1, 'ملاحظات وشروط القائمة', '2026-08-22 17:57:25', '2026-08-22 17:57:25');
+INSERT INTO `sales_price_lists` (`id`, `company_id`, `branch_id`, `code`, `name_ar`, `name_en`, `currency`, `is_active`, `notes`, `created_at`, `updated_at`) VALUES
+(1, 1, NULL, 'PL-147', 'اسم القائمة (عربي) *', 'اسم القائمة (إنجليزي)', 'EGP', 1, 'ملاحظات وشروط القائمة', '2026-08-22 17:57:25', '2026-08-22 17:57:25');
 
 -- --------------------------------------------------------
 
@@ -2321,6 +2364,7 @@ INSERT INTO `sales_price_list_items` (`id`, `price_list_id`, `product_id`, `min_
 CREATE TABLE `sales_quotations` (
   `id` bigint(20) UNSIGNED NOT NULL,
   `company_id` bigint(20) UNSIGNED DEFAULT 1,
+  `branch_id` int(11) DEFAULT NULL,
   `customer_id` bigint(20) UNSIGNED NOT NULL,
   `quote_number` varchar(50) NOT NULL,
   `issue_date` date NOT NULL,
@@ -2338,9 +2382,9 @@ CREATE TABLE `sales_quotations` (
 -- Dumping data for table `sales_quotations`
 --
 
-INSERT INTO `sales_quotations` (`id`, `company_id`, `customer_id`, `quote_number`, `issue_date`, `expiry_date`, `status`, `subtotal`, `tax_amount`, `total_amount`, `notes`, `created_at`, `updated_at`) VALUES
-(1, 1, 2, 'QT-2026083212', '2026-08-22', '2026-09-21', 'draft', 6350.00, 952.50, 7302.50, '', '2026-08-22 17:18:13', '2026-08-22 17:18:13'),
-(2, 1, 13, 'QT-2026086823', '2026-08-23', '2026-09-22', 'accepted', 59800.00, 8970.00, 68770.00, 'as per the term and condition ', '2026-08-23 00:45:33', '2026-08-23 00:45:33');
+INSERT INTO `sales_quotations` (`id`, `company_id`, `branch_id`, `customer_id`, `quote_number`, `issue_date`, `expiry_date`, `status`, `subtotal`, `tax_amount`, `total_amount`, `notes`, `created_at`, `updated_at`) VALUES
+(1, 1, 1, 2, 'QT-2026083212', '2026-08-22', '2026-09-21', 'draft', 6350.00, 952.50, 7302.50, '', '2026-08-22 17:18:13', '2026-08-29 18:03:24'),
+(2, 1, 1, 13, 'QT-2026086823', '2026-08-23', '2026-09-22', 'accepted', 59800.00, 8970.00, 68770.00, 'as per the term and condition ', '2026-08-23 00:45:33', '2026-08-29 18:03:24');
 
 -- --------------------------------------------------------
 
@@ -2380,6 +2424,7 @@ INSERT INTO `sales_quotation_lines` (`id`, `quotation_id`, `product_id`, `descri
 CREATE TABLE `sales_receipts` (
   `id` bigint(20) UNSIGNED NOT NULL,
   `company_id` bigint(20) UNSIGNED DEFAULT 1,
+  `branch_id` int(11) DEFAULT NULL,
   `receipt_number` varchar(50) NOT NULL,
   `customer_id` bigint(20) UNSIGNED NOT NULL,
   `invoice_id` bigint(20) UNSIGNED DEFAULT NULL,
@@ -2396,8 +2441,8 @@ CREATE TABLE `sales_receipts` (
 -- Dumping data for table `sales_receipts`
 --
 
-INSERT INTO `sales_receipts` (`id`, `company_id`, `receipt_number`, `customer_id`, `invoice_id`, `amount`, `payment_method`, `receipt_date`, `reference_no`, `notes`, `created_at`, `updated_at`) VALUES
-(1, 1, 'RCT-2026088906', 2, NULL, 2500.00, 'bank_transfer', '2026-08-22', '6453163164165', 'ملاحظات / البيان', '2026-08-22 17:43:52', '2026-08-22 17:43:52');
+INSERT INTO `sales_receipts` (`id`, `company_id`, `branch_id`, `receipt_number`, `customer_id`, `invoice_id`, `amount`, `payment_method`, `receipt_date`, `reference_no`, `notes`, `created_at`, `updated_at`) VALUES
+(1, 1, NULL, 'RCT-2026088906', 2, NULL, 2500.00, 'bank_transfer', '2026-08-22', '6453163164165', 'ملاحظات / البيان', '2026-08-22 17:43:52', '2026-08-22 17:43:52');
 
 -- --------------------------------------------------------
 
@@ -2441,6 +2486,7 @@ INSERT INTO `sales_representatives` (`id`, `company_id`, `code`, `name_ar`, `nam
 CREATE TABLE `sales_returns` (
   `id` bigint(20) UNSIGNED NOT NULL,
   `company_id` bigint(20) UNSIGNED DEFAULT 1,
+  `branch_id` int(11) DEFAULT NULL,
   `customer_id` bigint(20) UNSIGNED NOT NULL,
   `invoice_id` bigint(20) UNSIGNED DEFAULT NULL,
   `return_number` varchar(50) NOT NULL,
@@ -2458,8 +2504,8 @@ CREATE TABLE `sales_returns` (
 -- Dumping data for table `sales_returns`
 --
 
-INSERT INTO `sales_returns` (`id`, `company_id`, `customer_id`, `invoice_id`, `return_number`, `return_date`, `status`, `subtotal`, `tax_amount`, `total_amount`, `reason`, `created_at`, `updated_at`) VALUES
-(1, 1, 8, NULL, 'SRN-2026089312', '2026-08-22', 'draft', 11050.00, 1657.50, 12707.50, '', '2026-08-22 17:51:07', '2026-08-22 17:51:07');
+INSERT INTO `sales_returns` (`id`, `company_id`, `branch_id`, `customer_id`, `invoice_id`, `return_number`, `return_date`, `status`, `subtotal`, `tax_amount`, `total_amount`, `reason`, `created_at`, `updated_at`) VALUES
+(1, 1, NULL, 8, NULL, 'SRN-2026089312', '2026-08-22', 'draft', 11050.00, 1657.50, 12707.50, '', '2026-08-22 17:51:07', '2026-08-22 17:51:07');
 
 -- --------------------------------------------------------
 
@@ -2494,6 +2540,7 @@ INSERT INTO `sales_return_lines` (`id`, `return_id`, `product_id`, `description`
 CREATE TABLE `stock_adjustments` (
   `id` bigint(20) UNSIGNED NOT NULL,
   `company_id` bigint(20) UNSIGNED DEFAULT 1,
+  `branch_id` int(11) DEFAULT 0,
   `adjustment_number` varchar(50) NOT NULL,
   `warehouse_id` bigint(20) UNSIGNED NOT NULL,
   `adjustment_type` enum('addition','subtraction') NOT NULL DEFAULT 'addition',
@@ -2509,8 +2556,8 @@ CREATE TABLE `stock_adjustments` (
 -- Dumping data for table `stock_adjustments`
 --
 
-INSERT INTO `stock_adjustments` (`id`, `company_id`, `adjustment_number`, `warehouse_id`, `adjustment_type`, `adjustment_date`, `status`, `reason`, `notes`, `created_at`, `updated_at`) VALUES
-(1, 1, 'ADJ-26082274', 2, 'addition', '2026-08-22', 'draft', 'جرد سنوي ', 'ملاحظات تفصيلية', '2026-08-22 23:41:16', '2026-08-22 23:41:16');
+INSERT INTO `stock_adjustments` (`id`, `company_id`, `branch_id`, `adjustment_number`, `warehouse_id`, `adjustment_type`, `adjustment_date`, `status`, `reason`, `notes`, `created_at`, `updated_at`) VALUES
+(1, 1, 1, 'ADJ-26082274', 2, 'addition', '2026-08-22', 'draft', 'جرد سنوي ', 'ملاحظات تفصيلية', '2026-08-22 23:41:16', '2026-09-07 23:00:09');
 
 -- --------------------------------------------------------
 
@@ -2543,6 +2590,7 @@ INSERT INTO `stock_adjustment_items` (`id`, `adjustment_id`, `product_id`, `quan
 CREATE TABLE `stock_movements` (
   `id` bigint(20) UNSIGNED NOT NULL,
   `company_id` bigint(20) UNSIGNED DEFAULT 1,
+  `branch_id` int(11) DEFAULT 0,
   `product_id` bigint(20) UNSIGNED NOT NULL,
   `warehouse_id` bigint(20) UNSIGNED NOT NULL,
   `movement_type` enum('in','out') NOT NULL,
@@ -2557,9 +2605,11 @@ CREATE TABLE `stock_movements` (
 -- Dumping data for table `stock_movements`
 --
 
-INSERT INTO `stock_movements` (`id`, `company_id`, `product_id`, `warehouse_id`, `movement_type`, `reference_type`, `reference_number`, `quantity`, `balance_after`, `created_at`) VALUES
-(1, 1, 5, 4, 'out', 'purchase_return', 'RET-26082225', 1.00, 0.00, '2026-08-22 23:58:15'),
-(2, 1, 5, 4, 'out', 'purchase_return', 'RET-26082225', 1.00, 0.00, '2026-08-23 00:01:37');
+INSERT INTO `stock_movements` (`id`, `company_id`, `branch_id`, `product_id`, `warehouse_id`, `movement_type`, `reference_type`, `reference_number`, `quantity`, `balance_after`, `created_at`) VALUES
+(1, 1, 1, 5, 4, 'out', 'purchase_return', 'RET-26082225', 1.00, 0.00, '2026-08-22 23:58:15'),
+(2, 1, 2, 5, 4, 'out', 'purchase_return', 'RET-26082225', 1.00, 0.00, '2026-08-23 00:01:37'),
+(3, 1, 0, 1, 1, 'out', 'transfer_out', 'TRN-26082264', 50.00, 0.00, '2026-09-08 01:02:43'),
+(4, 1, 0, 1, 2, 'in', 'transfer_in', 'TRN-26082264', 50.00, 0.00, '2026-09-08 01:02:43');
 
 -- --------------------------------------------------------
 
@@ -2570,6 +2620,7 @@ INSERT INTO `stock_movements` (`id`, `company_id`, `product_id`, `warehouse_id`,
 CREATE TABLE `stock_returns` (
   `id` bigint(20) UNSIGNED NOT NULL,
   `company_id` bigint(20) UNSIGNED DEFAULT 1,
+  `branch_id` int(11) DEFAULT 0,
   `return_number` varchar(50) NOT NULL,
   `return_type` enum('sales_return','purchase_return') NOT NULL DEFAULT 'sales_return',
   `warehouse_id` bigint(20) UNSIGNED NOT NULL,
@@ -2585,9 +2636,9 @@ CREATE TABLE `stock_returns` (
 -- Dumping data for table `stock_returns`
 --
 
-INSERT INTO `stock_returns` (`id`, `company_id`, `return_number`, `return_type`, `warehouse_id`, `party_name`, `return_date`, `status`, `notes`, `created_at`, `updated_at`) VALUES
-(1, 1, 'RET-26082225', 'purchase_return', 4, 'محمد أبو المعاطي', '2026-08-22', 'approved', '', '2026-08-22 23:26:03', '2026-08-22 23:26:03'),
-(2, 1, 'RET-26082226', 'purchase_return', 2, 'محمد أبو المعاطي', '2026-08-22', 'draft', '', '2026-08-22 23:30:08', '2026-08-22 23:30:08');
+INSERT INTO `stock_returns` (`id`, `company_id`, `branch_id`, `return_number`, `return_type`, `warehouse_id`, `party_name`, `return_date`, `status`, `notes`, `created_at`, `updated_at`) VALUES
+(1, 1, 1, 'RET-26082225', 'purchase_return', 4, 'محمد أبو المعاطي', '2026-08-22', 'approved', '', '2026-08-22 23:26:03', '2026-09-07 23:00:01'),
+(2, 1, 2, 'RET-26082226', 'purchase_return', 2, 'محمد أبو المعاطي', '2026-08-22', 'draft', '', '2026-08-22 23:30:08', '2026-09-07 23:00:03');
 
 -- --------------------------------------------------------
 
@@ -2620,6 +2671,7 @@ INSERT INTO `stock_return_items` (`id`, `return_id`, `product_id`, `quantity`, `
 CREATE TABLE `stock_transfers` (
   `id` bigint(20) UNSIGNED NOT NULL,
   `company_id` bigint(20) UNSIGNED DEFAULT 1,
+  `branch_id` int(11) DEFAULT 0,
   `transfer_number` varchar(50) NOT NULL,
   `from_warehouse_id` bigint(20) UNSIGNED NOT NULL,
   `to_warehouse_id` bigint(20) UNSIGNED NOT NULL,
@@ -2634,9 +2686,9 @@ CREATE TABLE `stock_transfers` (
 -- Dumping data for table `stock_transfers`
 --
 
-INSERT INTO `stock_transfers` (`id`, `company_id`, `transfer_number`, `from_warehouse_id`, `to_warehouse_id`, `transfer_date`, `status`, `notes`, `created_at`, `updated_at`) VALUES
-(1, 1, 'TRN-26082264', 1, 2, '2026-08-22', 'in_transit', 'بيان وملاحظات النقل', '2026-08-22 22:57:52', '2026-08-22 22:57:52'),
-(2, 1, 'TRN-26082292', 5, 4, '2026-08-22', 'draft', '', '2026-08-22 23:00:40', '2026-08-22 23:00:40');
+INSERT INTO `stock_transfers` (`id`, `company_id`, `branch_id`, `transfer_number`, `from_warehouse_id`, `to_warehouse_id`, `transfer_date`, `status`, `notes`, `created_at`, `updated_at`) VALUES
+(1, 1, 1, 'TRN-26082264', 1, 2, '2026-08-22', 'completed', 'بيان وملاحظات النقل', '2026-08-22 22:57:52', '2026-09-08 01:02:43'),
+(2, 1, 2, 'TRN-26082292', 5, 4, '2026-08-22', 'draft', '', '2026-08-22 23:00:40', '2026-09-07 23:00:25');
 
 -- --------------------------------------------------------
 
@@ -2656,8 +2708,8 @@ CREATE TABLE `stock_transfer_items` (
 --
 
 INSERT INTO `stock_transfer_items` (`id`, `transfer_id`, `product_id`, `quantity`) VALUES
-(1, 1, 1, 50.00),
-(3, 2, 5, 1.00);
+(3, 2, 5, 1.00),
+(4, 1, 1, 50.00);
 
 -- --------------------------------------------------------
 
@@ -2945,6 +2997,7 @@ CREATE TABLE `taxes` (
   `rate` decimal(5,2) NOT NULL DEFAULT 15.00,
   `is_active` tinyint(1) NOT NULL DEFAULT 1,
   `company_id` bigint(20) UNSIGNED DEFAULT 1,
+  `branch_id` int(11) DEFAULT 0,
   `tax_type` enum('vat','wht','sales','other') NOT NULL DEFAULT 'vat',
   `account_id` bigint(20) UNSIGNED DEFAULT NULL,
   `notes` varchar(255) DEFAULT NULL
@@ -2954,8 +3007,9 @@ CREATE TABLE `taxes` (
 -- Dumping data for table `taxes`
 --
 
-INSERT INTO `taxes` (`id`, `code`, `name_ar`, `tax_rate`, `name_en`, `type`, `rate`, `is_active`, `company_id`, `tax_type`, `account_id`, `notes`) VALUES
-(1, 'CUST-61551787404225', 'محمد ابوالمعاطي', 14.00, 'Mohamed Abo-Elmaaty', 'percentage', 15.00, 1, 1, 'vat', 1, 'اضافة راس مال');
+INSERT INTO `taxes` (`id`, `code`, `name_ar`, `tax_rate`, `name_en`, `type`, `rate`, `is_active`, `company_id`, `branch_id`, `tax_type`, `account_id`, `notes`) VALUES
+(1, 'CUST-61551787404225', 'محمد ابوالمعاطي', 14.00, 'Mohamed Abo-Elmaaty', 'percentage', 15.00, 1, 1, 1, 'vat', 1, 'اضافة راس مال'),
+(2, '', 'Tax Name (AR) *', 0.00, 'Tax Name (EN)', 'percentage', 10.00, 1, 1, 1, 'vat', 1, 'Notes');
 
 -- --------------------------------------------------------
 
@@ -3142,6 +3196,7 @@ INSERT INTO `users` (`id`, `company_id`, `branch_id`, `role_id`, `username`, `em
 CREATE TABLE `warehouses` (
   `id` bigint(20) UNSIGNED NOT NULL,
   `company_id` bigint(20) UNSIGNED DEFAULT 1,
+  `branch_id` int(11) DEFAULT 0,
   `code` varchar(50) NOT NULL,
   `name_ar` varchar(255) NOT NULL,
   `name_en` varchar(255) DEFAULT NULL,
@@ -3157,12 +3212,12 @@ CREATE TABLE `warehouses` (
 -- Dumping data for table `warehouses`
 --
 
-INSERT INTO `warehouses` (`id`, `company_id`, `code`, `name_ar`, `name_en`, `location`, `manager_name`, `phone`, `is_active`, `created_at`, `updated_at`) VALUES
-(1, 1, 'WH-246', 'المستودع الرئيسي', 'Main ', 'موقع المستودع / العنوان', 'محمد أبوالمعاطي', '01275844735', 1, '2026-08-22 22:50:42', '2026-08-22 22:50:42'),
-(2, 1, 'WH-RUH-01', 'Riyadh Branch Warehouse', NULL, 'Riyadh, Olaya', NULL, NULL, 1, '2026-08-22 22:53:30', '2026-08-22 22:53:30'),
-(3, 1, 'WH-001', 'المستودع الرئيسي', '', 'المبنى الرئيسي - المنطقة الصناعية', '', '', 0, '2026-08-22 22:53:30', '2026-08-22 22:53:45'),
-(4, 1, 'WH-002', 'مستودع المعرض', NULL, 'فرع المعرض العام', NULL, NULL, 1, '2026-08-22 22:53:30', '2026-08-22 22:53:30'),
-(5, 1, 'WH-003', 'مستودع المرتجعات', NULL, 'مبنى الخدمات الملحق', NULL, NULL, 1, '2026-08-22 22:53:30', '2026-08-22 22:53:30');
+INSERT INTO `warehouses` (`id`, `company_id`, `branch_id`, `code`, `name_ar`, `name_en`, `location`, `manager_name`, `phone`, `is_active`, `created_at`, `updated_at`) VALUES
+(1, 1, 1, 'WH-246', 'المستودع الرئيسي', 'Main ', 'موقع المستودع / العنوان', 'محمد أبوالمعاطي', '01275844735', 1, '2026-08-22 22:50:42', '2026-09-08 00:56:03'),
+(2, 1, 2, 'WH-RUH-01', 'Riyadh Branch Warehouse', NULL, 'Riyadh, Olaya', NULL, NULL, 1, '2026-08-22 22:53:30', '2026-09-08 00:56:08'),
+(3, 1, 3, 'WH-001', 'المستودع الرئيسي', '', 'المبنى الرئيسي - المنطقة الصناعية', '', '', 0, '2026-08-22 22:53:30', '2026-09-08 00:56:11'),
+(4, 1, 4, 'WH-002', 'مستودع المعرض', NULL, 'فرع المعرض العام', NULL, NULL, 1, '2026-08-22 22:53:30', '2026-09-08 00:56:13'),
+(5, 1, 1, 'WH-003', 'Warehouse Name (Arabic) ', 'Warehouse Name (English)', 'مبنى الخدمات الملحق', '', '', 1, '2026-08-22 22:53:30', '2026-09-08 00:57:08');
 
 --
 -- Indexes for dumped tables
@@ -4108,7 +4163,7 @@ ALTER TABLE `crm_leads`
 -- AUTO_INCREMENT for table `customers`
 --
 ALTER TABLE `customers`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=14;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=15;
 
 --
 -- AUTO_INCREMENT for table `delivery_notes`
@@ -4126,7 +4181,7 @@ ALTER TABLE `delivery_note_items`
 -- AUTO_INCREMENT for table `fiscal_periods`
 --
 ALTER TABLE `fiscal_periods`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
 
 --
 -- AUTO_INCREMENT for table `fiscal_sub_periods`
@@ -4330,7 +4385,7 @@ ALTER TABLE `permissions`
 -- AUTO_INCREMENT for table `products`
 --
 ALTER TABLE `products`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
 
 --
 -- AUTO_INCREMENT for table `product_categories`
@@ -4444,13 +4499,13 @@ ALTER TABLE `rfqs`
 -- AUTO_INCREMENT for table `rfq_items`
 --
 ALTER TABLE `rfq_items`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
 --
 -- AUTO_INCREMENT for table `rfq_suppliers`
 --
 ALTER TABLE `rfq_suppliers`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
 --
 -- AUTO_INCREMENT for table `roles`
@@ -4564,7 +4619,7 @@ ALTER TABLE `stock_adjustment_items`
 -- AUTO_INCREMENT for table `stock_movements`
 --
 ALTER TABLE `stock_movements`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
 
 --
 -- AUTO_INCREMENT for table `stock_returns`
@@ -4588,7 +4643,7 @@ ALTER TABLE `stock_transfers`
 -- AUTO_INCREMENT for table `stock_transfer_items`
 --
 ALTER TABLE `stock_transfer_items`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
 
 --
 -- AUTO_INCREMENT for table `suppliers`
@@ -4672,7 +4727,7 @@ ALTER TABLE `sys_users`
 -- AUTO_INCREMENT for table `taxes`
 --
 ALTER TABLE `taxes`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
 --
 -- AUTO_INCREMENT for table `treasury_cheques`

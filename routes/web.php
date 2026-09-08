@@ -409,7 +409,7 @@ $router->post('/inventory/warehouses/store', [\App\Modules\Inventory\Warehouses\
 $router->get('/inventory/warehouses/{id}/edit', [\App\Modules\Inventory\Warehouses\Http\Controllers\WarehouseController::class, 'edit']);
 $router->post('/inventory/warehouses/{id}/update', [\App\Modules\Inventory\Warehouses\Http\Controllers\WarehouseController::class, 'update']);
 $router->post('/inventory/warehouses/{id}/delete', [\App\Modules\Inventory\Warehouses\Http\Controllers\WarehouseController::class, 'delete']);
-
+$router->get('/inventory/warehouses/{id}', [\App\Modules\Inventory\Warehouses\Http\Controllers\WarehouseController::class, 'show']);
 // Stock Transfers
 $router->get('/inventory/stock/transfers', [\App\Modules\Inventory\Http\Controllers\TransferController::class, 'index']);
 $router->get('/inventory/stock/transfers/create', [\App\Modules\Inventory\Http\Controllers\TransferController::class, 'create']);
@@ -534,13 +534,15 @@ $router->get('/accounting/taxes/{id}/edit', [\App\Modules\Accounting\Http\Contro
 $router->post('/accounting/taxes/{id}/update', [\App\Modules\Accounting\Http\Controllers\TaxController::class, 'update']);
 $router->post('/accounting/taxes/{id}/delete', [\App\Modules\Accounting\Http\Controllers\TaxController::class, 'delete']);
 
-// Financial Statements & Executive Reports
-$router->get('/accounting/reports/balance-sheet', [\App\Modules\Accounting\Http\Controllers\FinancialReportController::class, 'balanceSheet']);
-$router->get('/accounting/reports/cash-flow', [\App\Modules\Accounting\Http\Controllers\FinancialReportController::class, 'cashFlow']);
-$router->get('/accounting/reports/vat-return', [\App\Modules\Accounting\Http\Controllers\FinancialReportController::class, 'vatReturn']);
-$router->get('/accounting/reports/ledger', [\App\Modules\Accounting\Http\Controllers\FinancialReportController::class, 'ledger']);
-$router->get('/accounting/reports/trial-balance', [\App\Modules\Accounting\Http\Controllers\FinancialReportController::class, 'trialBalance']);
-$router->get('/accounting/reports/income-statement', [\App\Modules\Accounting\Http\Controllers\IncomeStatementController::class, 'index']);
+// ==========================================
+// FINANCIAL REPORTS (ReportController)
+// ==========================================
+$router->get('/accounting/reports/ledger', [\App\Modules\Accounting\Http\Controllers\ReportController::class, 'ledger']);
+$router->get('/accounting/reports/trial-balance', [\App\Modules\Accounting\Http\Controllers\ReportController::class, 'trialBalance']);
+$router->get('/accounting/reports/balance-sheet', [\App\Modules\Accounting\Http\Controllers\ReportController::class, 'balanceSheet']);
+$router->get('/accounting/reports/income-statement', [\App\Modules\Accounting\Http\Controllers\ReportController::class, 'incomeStatement']);
+$router->get('/accounting/reports/cash-flow', [\App\Modules\Accounting\Http\Controllers\ReportController::class, 'cashFlow']);
+$router->get('/accounting/reports/vat-return', [\App\Modules\Accounting\Http\Controllers\ReportController::class, 'vatReturn']);
 
 // ==========================================
 // TREASURY & BANKING MODULE

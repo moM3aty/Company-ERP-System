@@ -13,25 +13,26 @@ use Throwable;
 
 class TransferController extends Controller
 {
-    private string $basePath;
-    private PDO $db;
+    private $basePath;
+    private $db;
 
     public function __construct()
     {
-        ini_set('display_errors', 1);
-        ini_set('display_startup_errors', 1);
+        ini_set('display_errors', '0');
         error_reporting(E_ALL);
 
         global $basePath, $app;
-        $this->basePath = $basePath ?? dirname(__DIR__, 4);
+        $this->basePath = isset($basePath) ? $basePath : dirname(__DIR__, 4);
         
         if ($app && $app->has(PDO::class)) {
             $this->db = $app->get(PDO::class);
-            $this->db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+            if ($this->db) {
+                $this->db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+            }
         }
     }
 
-    private function resolveId($id = null): ?int
+    private function resolveId($id = null)
     {
         if (!empty($id) && is_numeric($id)) return (int)$id;
         $uri = $_SERVER['REQUEST_URI'] ?? '';
@@ -41,7 +42,38 @@ class TransferController extends Controller
         return null;
     }
 
-    public function index(Request $request, Response $response): Response
+    private function getCompanyId()
+    {
+        if (session_status() === PHP_SESSION_NONE) session_start();
+        return (int)($_SESSION['company_id'] ?? 1);
+    }
+
+    private function getActiveBranchId()
+    {
+        if (session_status() === PHP_SESSION_NONE) session_start();
+        return (int)($_SESSION['branch_id'] ?? 0);
+    }
+
+    private function hasBranchColumn($table)
+    {
+        if (!$this->db) return false;
+        try {
+            $this->db->query("SELECT branch_id FROM {$table} LIMIT 1");
+            return true;
+        } catch (Throwable $e) {
+            return false;
+        }
+    }
+
+    private function buildBranchCond($tableAlias, $branchId, $tableName)
+    {
+        if ($branchId <= 0) return "";
+        if (!$this->hasBranchColumn($tableName)) return "";
+        $col = $tableAlias ? "{$tableAlias}.branch_id" : "branch_id";
+        return " AND ({$col} = {$branchId} OR {$col} = 0 OR {$col} IS NULL)";
+    }
+
+    public function index(Request $request, Response $response)
     {
         $uri = $_SERVER['REQUEST_URI'] ?? '';
         if (preg_match('#/transfers/(\d+)/edit#', $uri, $m)) {
@@ -63,12 +95,18 @@ class TransferController extends Controller
         $offset = ($page - 1) * $limit;
 
         try {
-            $whereClause = "";
-            $params = [];
+            $companyId = $this->getCompanyId();
+            $branchId = $this->getActiveBranchId();
+
+            $condST = $this->buildBranchCond('st', $branchId, 'stock_transfers');
+
+            $whereClause = "WHERE st.company_id = ?";
+            $params = [$companyId];
+
             if ($search !== '') {
-                $whereClause = "WHERE st.transfer_number LIKE ? OR w1.name_ar LIKE ? OR w2.name_ar LIKE ?";
+                $whereClause .= " AND (st.transfer_number LIKE ? OR w1.name_ar LIKE ? OR w2.name_ar LIKE ?)";
                 $like = "%{$search}%";
-                $params = [$like, $like, $like];
+                array_push($params, $like, $like, $like);
             }
 
             $countStmt = $this->db->prepare("
@@ -76,7 +114,7 @@ class TransferController extends Controller
                 FROM stock_transfers st
                 LEFT JOIN warehouses w1 ON st.from_warehouse_id = w1.id
                 LEFT JOIN warehouses w2 ON st.to_warehouse_id = w2.id
-                $whereClause
+                $whereClause $condST
             ");
             $countStmt->execute($params);
             $totalItems = $countStmt->fetchColumn();
@@ -90,7 +128,7 @@ class TransferController extends Controller
                 FROM stock_transfers st
                 LEFT JOIN warehouses w1 ON st.from_warehouse_id = w1.id
                 LEFT JOIN warehouses w2 ON st.to_warehouse_id = w2.id
-                $whereClause
+                $whereClause $condST
                 ORDER BY st.id DESC LIMIT $limit OFFSET $offset
             ");
             $stmt->execute($params);
@@ -101,7 +139,7 @@ class TransferController extends Controller
                     COUNT(*) as total, 
                     SUM(IF(status='in_transit', 1, 0)) as in_transit, 
                     SUM(IF(status='completed', 1, 0)) as completed 
-                FROM stock_transfers
+                FROM stock_transfers st WHERE company_id = $companyId $condST
             ")->fetch(PDO::FETCH_OBJ);
 
         } catch (Throwable $e) {
@@ -115,56 +153,79 @@ class TransferController extends Controller
         ob_start();
         include $this->basePath . '/resources/views/inventory/transfers/index.php';
         $content = ob_get_clean();
+        
         ob_start(); include $this->basePath . '/resources/views/layouts/app.php';
         return $response->setContent(ob_get_clean())->setHeader('Content-Type', 'text/html');
     }
 
-    public function create(Request $request, Response $response): Response
+    public function create(Request $request, Response $response)
     {
         $transfer = null; $items = []; $warehouses = []; $products = [];
         try {
-            $warehouses = $this->db->query("SELECT id, name_ar, code FROM warehouses WHERE is_active = 1 ORDER BY name_ar ASC")->fetchAll(PDO::FETCH_OBJ);
-            $products = $this->db->query("SELECT id, item_code as code, name_ar FROM products WHERE is_active = 1 ORDER BY name_ar ASC")->fetchAll(PDO::FETCH_OBJ);
+            $companyId = $this->getCompanyId();
+            $branchId = $this->getActiveBranchId();
+
+            $condW = $this->buildBranchCond('', $branchId, 'warehouses');
+            $condP = $this->buildBranchCond('', $branchId, 'products');
+
+            $warehouses = $this->db->query("SELECT id, name_ar, code FROM warehouses WHERE company_id = $companyId AND is_active = 1 $condW ORDER BY name_ar ASC")->fetchAll(PDO::FETCH_OBJ);
+            $products = $this->db->query("SELECT id, item_code as code, name_ar FROM products WHERE company_id = $companyId AND is_active = 1 $condP ORDER BY name_ar ASC")->fetchAll(PDO::FETCH_OBJ);
         } catch (Throwable $e) {}
 
         ob_start(); 
         include $this->basePath . '/resources/views/inventory/transfers/create.php';
         $content = ob_get_clean();
+        
         ob_start(); include $this->basePath . '/resources/views/layouts/app.php';
         return $response->setContent(ob_get_clean())->setHeader('Content-Type', 'text/html');
     }
 
-    public function store(Request $request, Response $response): Response
+    public function store(Request $request, Response $response)
     {
         $data = $_POST;
         if (session_status() === PHP_SESSION_NONE) session_start();
+        $isAr = ($_SESSION['locale'] ?? 'ar') === 'ar';
 
         try {
             if (empty($data['from_warehouse_id']) || empty($data['to_warehouse_id'])) {
-                throw new Exception("يجب تحديد مستودع المصدر ومستودع الوجهة.");
+                throw new Exception($isAr ? "يجب تحديد مستودع المصدر ومستودع الوجهة." : "From and To warehouses are required.");
             }
             if ($data['from_warehouse_id'] == $data['to_warehouse_id']) {
-                throw new Exception("لا يمكن التحويل لنفس المستودع!");
+                throw new Exception($isAr ? "لا يمكن التحويل لنفس المستودع!" : "Cannot transfer to the same warehouse.");
             }
 
             $this->db->beginTransaction();
 
-            $companyId = $_SESSION['company_id'] ?? 1;
+            $companyId = $this->getCompanyId();
+            $branchId = $this->getActiveBranchId();
             $transferNum = !empty($data['transfer_number']) ? trim($data['transfer_number']) : 'TRN-' . date('ymd') . rand(10, 99);
             $status = $data['status'] ?? 'draft';
 
+            $hasBranchST = $this->hasBranchColumn('stock_transfers');
+            $branchCol = $hasBranchST ? ", branch_id" : "";
+            $branchVal = $hasBranchST ? ", ?" : "";
+
             $stmt = $this->db->prepare("
-                INSERT INTO stock_transfers (company_id, transfer_number, from_warehouse_id, to_warehouse_id, transfer_date, status, notes)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO stock_transfers (company_id, transfer_number, from_warehouse_id, to_warehouse_id, transfer_date, status, notes {$branchCol})
+                VALUES (?, ?, ?, ?, ?, ?, ? {$branchVal})
             ");
-            $stmt->execute([
+            
+            $params = [
                 $companyId, $transferNum, $data['from_warehouse_id'], $data['to_warehouse_id'],
                 $data['transfer_date'], $status, $data['notes'] ?? null
-            ]);
+            ];
+            if ($hasBranchST) $params[] = $branchId;
+
+            $stmt->execute($params);
             $transferId = $this->db->lastInsertId();
 
             $stmtItem = $this->db->prepare("INSERT INTO stock_transfer_items (transfer_id, product_id, quantity) VALUES (?, ?, ?)");
-            $stmtMov = $this->db->prepare("INSERT INTO stock_movements (company_id, product_id, warehouse_id, movement_type, reference_type, reference_number, quantity) VALUES (?, ?, ?, ?, ?, ?, ?)");
+            
+            $hasBranchSM = $this->hasBranchColumn('stock_movements');
+            $branchColSM = $hasBranchSM ? ", branch_id" : "";
+            $branchValSM = $hasBranchSM ? ", ?" : "";
+
+            $stmtMov = $this->db->prepare("INSERT INTO stock_movements (company_id, product_id, warehouse_id, movement_type, reference_type, reference_number, quantity {$branchColSM}) VALUES (?, ?, ?, ?, ?, ?, ? {$branchValSM})");
 
             if (!empty($data['product_id']) && is_array($data['product_id'])) {
                 foreach ($data['product_id'] as $idx => $prodId) {
@@ -175,32 +236,42 @@ class TransferController extends Controller
                     $stmtItem->execute([$transferId, $prodId, $qty]);
 
                     if ($status === 'completed') {
-                        $stmtMov->execute([$companyId, $prodId, $data['from_warehouse_id'], 'out', 'transfer_out', $transferNum, $qty]);
-                        $stmtMov->execute([$companyId, $prodId, $data['to_warehouse_id'], 'in', 'transfer_in', $transferNum, $qty]);
+                        $pOut = [$companyId, $prodId, $data['from_warehouse_id'], 'out', 'transfer_out', $transferNum, $qty];
+                        if ($hasBranchSM) $pOut[] = $branchId;
+                        $stmtMov->execute($pOut);
+
+                        $pIn = [$companyId, $prodId, $data['to_warehouse_id'], 'in', 'transfer_in', $transferNum, $qty];
+                        if ($hasBranchSM) $pIn[] = $branchId;
+                        $stmtMov->execute($pIn);
                     }
                 }
             }
 
             $this->db->commit();
-            $_SESSION['flash_msg'] = "تم إنشاء أمر التحويل بنجاح.";
+            $_SESSION['flash_msg'] = $isAr ? "تم إنشاء أمر التحويل بنجاح." : "Stock transfer created successfully.";
         } catch (Throwable $e) {
             if ($this->db->inTransaction()) $this->db->rollBack();
             $_SESSION['flash_err'] = "خطأ: " . $e->getMessage();
-            return new RedirectResponse('/ERP/inventory/stock/transfers/create');
+            header("Location: /ERP/inventory/stock/transfers/create");
+            exit;
         }
 
-        return new RedirectResponse('/ERP/inventory/stock/transfers');
+        header("Location: /ERP/inventory/stock/transfers");
+        exit;
     }
 
-    public function edit(Request $request, Response $response, $id = null): Response
+    public function edit(Request $request, Response $response, $id = null)
     {
         $id = $this->resolveId($id);
         
         try {
             if (!$id) throw new Exception("معرف أمر التحويل غير متاح.");
 
-            $stmt = $this->db->prepare("SELECT * FROM stock_transfers WHERE id = ?");
-            $stmt->execute([$id]);
+            $companyId = $this->getCompanyId();
+            $branchId = $this->getActiveBranchId();
+
+            $stmt = $this->db->prepare("SELECT * FROM stock_transfers WHERE id = ? AND company_id = ?");
+            $stmt->execute([$id, $companyId]);
             $transfer = $stmt->fetch(PDO::FETCH_OBJ);
             
             if (!$transfer) throw new Exception("أمر التحويل غير موجود بقاعدة البيانات.");
@@ -212,33 +283,40 @@ class TransferController extends Controller
             $stmtItems->execute([$id]);
             $items = $stmtItems->fetchAll(PDO::FETCH_OBJ);
 
-            $warehouses = $this->db->query("SELECT id, name_ar, code FROM warehouses WHERE is_active = 1 ORDER BY name_ar ASC")->fetchAll(PDO::FETCH_OBJ);
-            $products = $this->db->query("SELECT id, item_code as code, name_ar FROM products WHERE is_active = 1 ORDER BY name_ar ASC")->fetchAll(PDO::FETCH_OBJ);
+            $condW = $this->buildBranchCond('', $branchId, 'warehouses');
+            $condP = $this->buildBranchCond('', $branchId, 'products');
+
+            $warehouses = $this->db->query("SELECT id, name_ar, code FROM warehouses WHERE company_id = $companyId AND is_active = 1 $condW ORDER BY name_ar ASC")->fetchAll(PDO::FETCH_OBJ);
+            $products = $this->db->query("SELECT id, item_code as code, name_ar FROM products WHERE company_id = $companyId AND is_active = 1 $condP ORDER BY name_ar ASC")->fetchAll(PDO::FETCH_OBJ);
 
         } catch (Throwable $e) {
             if (session_status() === PHP_SESSION_NONE) session_start();
             $_SESSION['flash_err'] = $e->getMessage();
-            return new RedirectResponse('/ERP/inventory/stock/transfers');
+            header("Location: /ERP/inventory/stock/transfers");
+            exit;
         }
 
         ob_start(); 
         include $this->basePath . '/resources/views/inventory/transfers/create.php';
         $content = ob_get_clean();
+        
         ob_start(); include $this->basePath . '/resources/views/layouts/app.php';
         return $response->setContent(ob_get_clean())->setHeader('Content-Type', 'text/html');
     }
 
-    public function update(Request $request, Response $response, $id = null): Response
+    public function update(Request $request, Response $response, $id = null)
     {
         $id = $this->resolveId($id);
         $data = $_POST;
         if (session_status() === PHP_SESSION_NONE) session_start();
-        
+        $isAr = ($_SESSION['locale'] ?? 'ar') === 'ar';
+
         try {
             if (!$id) throw new Exception("معرف أمر التحويل مفقود.");
 
             $this->db->beginTransaction();
-            $companyId = $_SESSION['company_id'] ?? 1;
+            $companyId = $this->getCompanyId();
+            $branchId = $this->getActiveBranchId();
 
             $stmtNum = $this->db->prepare("SELECT transfer_number FROM stock_transfers WHERE id = ?");
             $stmtNum->execute([$id]);
@@ -249,17 +327,22 @@ class TransferController extends Controller
             $stmt = $this->db->prepare("
                 UPDATE stock_transfers 
                 SET from_warehouse_id=?, to_warehouse_id=?, transfer_date=?, status=?, notes=?
-                WHERE id=? AND status != 'completed'
+                WHERE id=? AND company_id=? AND status != 'completed'
             ");
             $stmt->execute([
                 $data['from_warehouse_id'], $data['to_warehouse_id'],
-                $data['transfer_date'], $status, $data['notes'] ?? null, $id
+                $data['transfer_date'], $status, $data['notes'] ?? null, $id, $companyId
             ]);
 
             $this->db->prepare("DELETE FROM stock_transfer_items WHERE transfer_id = ?")->execute([$id]);
 
             $stmtItem = $this->db->prepare("INSERT INTO stock_transfer_items (transfer_id, product_id, quantity) VALUES (?, ?, ?)");
-            $stmtMov = $this->db->prepare("INSERT INTO stock_movements (company_id, product_id, warehouse_id, movement_type, reference_type, reference_number, quantity) VALUES (?, ?, ?, ?, ?, ?, ?)");
+            
+            $hasBranchSM = $this->hasBranchColumn('stock_movements');
+            $branchColSM = $hasBranchSM ? ", branch_id" : "";
+            $branchValSM = $hasBranchSM ? ", ?" : "";
+
+            $stmtMov = $this->db->prepare("INSERT INTO stock_movements (company_id, product_id, warehouse_id, movement_type, reference_type, reference_number, quantity {$branchColSM}) VALUES (?, ?, ?, ?, ?, ?, ? {$branchValSM})");
 
             if (!empty($data['product_id']) && is_array($data['product_id'])) {
                 foreach ($data['product_id'] as $idx => $prodId) {
@@ -270,53 +353,64 @@ class TransferController extends Controller
                     $stmtItem->execute([$id, $prodId, $qty]);
 
                     if ($status === 'completed') {
-                        $stmtMov->execute([$companyId, $prodId, $data['from_warehouse_id'], 'out', 'transfer_out', $transferNum, $qty]);
-                        $stmtMov->execute([$companyId, $prodId, $data['to_warehouse_id'], 'in', 'transfer_in', $transferNum, $qty]);
+                        $pOut = [$companyId, $prodId, $data['from_warehouse_id'], 'out', 'transfer_out', $transferNum, $qty];
+                        if ($hasBranchSM) $pOut[] = $branchId;
+                        $stmtMov->execute($pOut);
+
+                        $pIn = [$companyId, $prodId, $data['to_warehouse_id'], 'in', 'transfer_in', $transferNum, $qty];
+                        if ($hasBranchSM) $pIn[] = $branchId;
+                        $stmtMov->execute($pIn);
                     }
                 }
             }
 
             $this->db->commit();
-            $_SESSION['flash_msg'] = "تم تحديث أمر التحويل بنجاح.";
+            $_SESSION['flash_msg'] = $isAr ? "تم تحديث أمر التحويل بنجاح." : "Stock transfer updated successfully.";
         } catch (Throwable $e) {
             if ($this->db->inTransaction()) $this->db->rollBack();
             $_SESSION['flash_err'] = "خطأ: " . $e->getMessage();
-            return new RedirectResponse("/ERP/inventory/stock/transfers/{$id}/edit");
+            header("Location: /ERP/inventory/stock/transfers/{$id}/edit");
+            exit;
         }
 
-        return new RedirectResponse('/ERP/inventory/stock/transfers');
+        header("Location: /ERP/inventory/stock/transfers");
+        exit;
     }
 
-    public function delete(Request $request, Response $response, $id = null): Response
+    public function delete(Request $request, Response $response, $id = null)
     {
         $id = $this->resolveId($id);
         if (session_status() === PHP_SESSION_NONE) session_start();
-        
+        $companyId = $this->getCompanyId();
+
         try {
             if (!$id) throw new Exception("المعرف غير صالح.");
 
-            $stmt = $this->db->prepare("SELECT status FROM stock_transfers WHERE id = ?");
-            $stmt->execute([$id]);
+            $stmt = $this->db->prepare("SELECT status FROM stock_transfers WHERE id = ? AND company_id = ?");
+            $stmt->execute([$id, $companyId]);
             $status = $stmt->fetchColumn();
 
             if ($status === 'completed') {
                 throw new Exception("لا يمكن حذف أمر تحويل مكتمل.");
             }
 
-            $this->db->prepare("DELETE FROM stock_transfers WHERE id = ?")->execute([$id]);
+            $this->db->prepare("DELETE FROM stock_transfers WHERE id = ? AND company_id = ?")->execute([$id, $companyId]);
             $_SESSION['flash_msg'] = "تم حذف أمر التحويل بنجاح.";
         } catch (Throwable $e) {
             $_SESSION['flash_err'] = $e->getMessage();
         }
-        return new RedirectResponse('/ERP/inventory/stock/transfers');
+        
+        header("Location: /ERP/inventory/stock/transfers");
+        exit;
     }
 
-    public function show(Request $request, Response $response, $id = null): Response
+    public function show(Request $request, Response $response, $id = null)
     {
-        $id = $this->resolveId($id);
-        
         try {
+            $id = $this->resolveId($id);
             if (!$id) throw new Exception("المعرف غير متاح.");
+
+            $companyId = $this->getCompanyId();
 
             $stmt = $this->db->prepare("
                 SELECT st.*, 
@@ -325,9 +419,9 @@ class TransferController extends Controller
                 FROM stock_transfers st
                 LEFT JOIN warehouses w1 ON st.from_warehouse_id = w1.id
                 LEFT JOIN warehouses w2 ON st.to_warehouse_id = w2.id
-                WHERE st.id = ?
+                WHERE st.id = ? AND st.company_id = ?
             ");
-            $stmt->execute([$id]);
+            $stmt->execute([$id, $companyId]);
             $transfer = $stmt->fetch(PDO::FETCH_OBJ);
             if (!$transfer) throw new Exception("أمر التحويل غير موجود.");
 
@@ -338,18 +432,20 @@ class TransferController extends Controller
                 WHERE i.transfer_id = ?
             ");
             $stmtItems->execute([$id]);
-            $items = $stmtItems->fetchAll(PDO::FETCH_OBJ);
+            $items = $stmtItems->fetchAll(PDO::FETCH_OBJ) ?: [];
+
+            ob_start(); 
+            include $this->basePath . '/resources/views/inventory/transfers/show.php';
+            $content = ob_get_clean();
+            
+            ob_start(); include $this->basePath . '/resources/views/layouts/app.php';
+            return $response->setContent(ob_get_clean())->setHeader('Content-Type', 'text/html');
 
         } catch (Throwable $e) {
             if (session_status() === PHP_SESSION_NONE) session_start();
             $_SESSION['flash_err'] = $e->getMessage();
-            return new RedirectResponse('/ERP/inventory/stock/transfers');
+            header("Location: /ERP/inventory/stock/transfers");
+            exit;
         }
-
-        ob_start(); 
-        include $this->basePath . '/resources/views/inventory/transfers/show.php';
-        $content = ob_get_clean();
-        ob_start(); include $this->basePath . '/resources/views/layouts/app.php';
-        return $response->setContent(ob_get_clean())->setHeader('Content-Type', 'text/html');
     }
 }

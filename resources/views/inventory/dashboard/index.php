@@ -2,19 +2,64 @@
 // Path: resources/views/inventory/dashboard/index.php
 
 if (session_status() === PHP_SESSION_NONE) session_start();
-$isRtl = ($_SESSION['locale'] ?? 'ar') === 'ar';
-$currency = 'SAR';
+$isRtl = isset($_SESSION['locale']) && $_SESSION['locale'] === 'en' ? false : true;
 
-$kpis = $kpis ?? [
-    'stock_value' => 0, 'total_products' => 0, 'active_warehouses' => 0,
-    'low_stock_alerts' => 0, 'total_movements' => 0, 'pending_transfers' => 0
-];
-$chartData = $chartData ?? [
-    'movements_in' => 0, 'movements_out' => 0,
-    'ops_breakdown' => ['transfers' => 0, 'deliveries' => 0, 'returns' => 0, 'adjustments' => 0]
-];
-$recentMovements = $recentMovements ?? [];
-$recentDeliveries = $recentDeliveries ?? [];
+$currency = function_exists('current_currency') ? current_currency() : 'EGP';
+$convert = function($amt) { return function_exists('convert_amount') ? convert_amount((float)$amt) : (float)$amt; };
+
+if (!isset($kpis)) {
+    $kpis = ['stock_value' => 0, 'total_products' => 0, 'active_warehouses' => 0, 'low_stock_alerts' => 0, 'total_movements' => 0, 'pending_transfers' => 0];
+}
+if (!isset($chartData)) {
+    $chartData = ['movements_in' => 0, 'movements_out' => 0, 'ops_breakdown' => ['transfers' => 0, 'deliveries' => 0, 'returns' => 0, 'adjustments' => 0]];
+}
+if (!isset($recentMovements)) $recentMovements = [];
+if (!isset($recentDeliveries)) $recentDeliveries = [];
+
+$activeBranchName = $_SESSION['active_branch_name'] ?? ($isRtl ? 'كل الفروع' : 'All Branches');
+
+$t = [
+    'ar' => [
+        'title' => 'لوحة التحكم المخزنية الشاملة',
+        'desc' => 'مراقبة تحركات البضائع، المستودعات، وقيمة المخزون لحظياً.',
+        'export' => 'تصدير لـ Excel',
+        'active_scope' => 'الفرع النشط حالياً:',
+        'card_ledger' => 'كارت الصنف', 'card_transfers' => 'التحويلات', 'card_deliveries' => 'أذون التسليم',
+        'card_returns' => 'المرتجعات', 'card_adjustments' => 'التسويات',
+        'kpi_value' => 'قيمة المنتجات التقديرية', 'kpi_products' => 'إجمالي الأصناف المسجلة',
+        'kpi_movements' => 'إجمالي الحركات المسجلة', 'kpi_pending' => 'تحويلات قيد الانتظار',
+        'chart_flow' => 'حجم التدفق المخزني (الوارد vs المنصرف)', 'chart_flow_in' => 'إجمالي الوارد (+)', 'chart_flow_out' => 'إجمالي المنصرف (-)',
+        'chart_ops' => 'توزيع أذون العمليات المخزنية',
+        'ops_transfers' => 'تحويلات', 'ops_deliveries' => 'تسليم', 'ops_returns' => 'مرتجعات', 'ops_adj' => 'تسويات',
+        'tbl_moves_title' => 'أحدث الحركات المخزنية', 'view_all' => 'عرض الكل ➔',
+        'col_branch' => 'الفرع', 'col_item' => 'الصنف', 'col_wh' => 'المستودع', 'col_type' => 'نوع الحركة', 'col_qty' => 'الكمية',
+        'in' => 'وارد (+)', 'out' => 'منصرف (-)', 'empty_moves' => 'لا توجد حركات مسجلة للفرع المحدد مؤخراً.',
+        'tbl_del_title' => 'أحدث أذون التسليم (مبيعات)',
+        'col_del_no' => 'رقم الإذن', 'col_cust' => 'العميل', 'col_date' => 'التاريخ', 'col_status' => 'الحالة',
+        'empty_del' => 'لا توجد أذون تسليم حديثة للفرع المحدد.',
+        'status_draft' => 'مسودة', 'status_delivered' => 'تم التسليم'
+    ],
+    'en' => [
+        'title' => 'Inventory Dashboard',
+        'desc' => 'Monitor goods movements, warehouses, and real-time inventory value.',
+        'export' => 'Export to Excel',
+        'active_scope' => 'Active Branch Scope:',
+        'card_ledger' => 'Stock Ledger', 'card_transfers' => 'Transfers', 'card_deliveries' => 'Delivery Notes',
+        'card_returns' => 'Returns', 'card_adjustments' => 'Adjustments',
+        'kpi_value' => 'Estimated Products Value', 'kpi_products' => 'Total Registered Products',
+        'kpi_movements' => 'Total Stock Movements', 'kpi_pending' => 'Pending Transfers',
+        'chart_flow' => 'Stock Flow Volume (IN vs OUT)', 'chart_flow_in' => 'Total Inflow (+)', 'chart_flow_out' => 'Total Outflow (-)',
+        'chart_ops' => 'Inventory Operations Distribution',
+        'ops_transfers' => 'Transfers', 'ops_deliveries' => 'Deliveries', 'ops_returns' => 'Returns', 'ops_adj' => 'Adjustments',
+        'tbl_moves_title' => 'Recent Stock Movements', 'view_all' => 'View All ➔',
+        'col_branch' => 'Branch', 'col_item' => 'Product', 'col_wh' => 'Warehouse', 'col_type' => 'Movement Type', 'col_qty' => 'Quantity',
+        'in' => 'IN (+)', 'out' => 'OUT (-)', 'empty_moves' => 'No recent movements recorded for this branch.',
+        'tbl_del_title' => 'Recent Delivery Notes',
+        'col_del_no' => 'Note No.', 'col_cust' => 'Customer', 'col_date' => 'Date', 'col_status' => 'Status',
+        'empty_del' => 'No recent delivery notes for this branch.',
+        'status_draft' => 'Draft', 'status_delivered' => 'Delivered'
+    ]
+][$isRtl ? 'ar' : 'en'];
 ?>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
@@ -32,13 +77,20 @@ $recentDeliveries = $recentDeliveries ?? [];
 
     .dash-wrapper { padding-bottom: 50px; font-family: <?= $isRtl ? "'Cairo', sans-serif" : "'Inter', sans-serif" ?>; }
     
-    .dash-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 28px; border-bottom: 1px solid var(--c-border); padding-bottom: 18px; }
+    .dash-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid var(--c-border); padding-bottom: 18px; }
     .dash-title-box { display: flex; align-items: center; gap: 16px; }
     .dash-icon { width: 52px; height: 52px; background: var(--c-brand-light); color: var(--c-brand); border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 2rem; box-shadow: 0 4px 12px rgba(37, 99, 235, 0.15); }
     .dash-title { margin: 0; color: var(--c-slate-dark); font-size: 1.8rem; font-weight: 800; }
     
     .btn-excel { background: #16a34a; color: #ffffff !important; border: none; padding: 10px 20px; border-radius: 10px; font-weight: 800; display: inline-flex; align-items: center; gap: 8px; text-decoration: none; cursor: pointer; transition: 0.2s; box-shadow: 0 4px 12px rgba(22, 163, 74, 0.2); }
     .btn-excel:hover { background: #15803d; transform: translateY(-2px); }
+
+    .branch-scope-badge {
+        display: inline-flex; align-items: center; gap: 8px;
+        background: #f8fafc; border: 1px solid var(--c-border);
+        padding: 6px 14px; border-radius: 20px; font-size: 0.8rem;
+        font-weight: 800; color: var(--c-slate-dark); margin-bottom: 24px;
+    }
 
     .hub-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px; margin-bottom: 32px; }
     .hub-card { background: var(--c-card-bg); border: 1px solid var(--c-border); border-radius: 12px; padding: 16px; display: flex; align-items: center; gap: 14px; text-decoration: none; color: var(--c-slate-dark); font-weight: 800; font-size: 0.9rem; transition: 0.2s; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
@@ -71,74 +123,82 @@ $recentDeliveries = $recentDeliveries ?? [];
         <div class="dash-title-box">
             <div class="dash-icon"><i class="ph-duotone ph-chart-line-up"></i></div>
             <div>
-                <h2 class="dash-title">لوحة التحكم المخزنية الشاملة</h2>
-                <p style="margin:4px 0 0 0; color:var(--c-slate-muted); font-weight:600;">مراقبة تحركات البضائع، المستودعات، وقيمة المخزون لحظياً.</p>
+                <h2 class="dash-title"><?= $t['title'] ?></h2>
+                <p style="margin:4px 0 0 0; color:var(--c-slate-muted); font-weight:600;"><?= $t['desc'] ?></p>
             </div>
         </div>
-        <button onclick="exportToExcel()" class="btn-excel"><i class="ph-bold ph-file-xls"></i> تصدير لـ Excel</button>
+        <button onclick="exportToExcel()" class="btn-excel"><i class="ph-bold ph-file-xls"></i> <?= $t['export'] ?></button>
+    </div>
+
+    <div>
+        <div class="branch-scope-badge">
+            <i class="ph-bold ph-storefront" style="color:var(--c-brand);"></i>
+            <span><?= $t['active_scope'] ?></span>
+            <span style="color:var(--c-brand); font-weight:900;"><?= htmlspecialchars($activeBranchName) ?></span>
+        </div>
     </div>
 
     <div class="hub-grid">
         <a href="/ERP/inventory/stock/ledger" class="hub-card">
             <div class="hub-icon" style="background:#eff6ff; color:#2563eb;"><i class="ph-duotone ph-list-dashes"></i></div>
-            <span>كارت الصنف</span>
+            <span><?= $t['card_ledger'] ?></span>
         </a>
         <a href="/ERP/inventory/stock/transfers" class="hub-card">
             <div class="hub-icon" style="background:#fff7ed; color:#ea580c;"><i class="ph-duotone ph-truck"></i></div>
-            <span>التحويلات</span>
+            <span><?= $t['card_transfers'] ?></span>
         </a>
         <a href="/ERP/inventory/delivery-notes" class="hub-card">
             <div class="hub-icon" style="background:#ecfdf5; color:#059669;"><i class="ph-duotone ph-package"></i></div>
-            <span>أذون التسليم</span>
+            <span><?= $t['card_deliveries'] ?></span>
         </a>
         <a href="/ERP/inventory/returns" class="hub-card">
             <div class="hub-icon" style="background:#fef2f2; color:#dc2626;"><i class="ph-duotone ph-arrow-u-down-left"></i></div>
-            <span>المرتجعات</span>
+            <span><?= $t['card_returns'] ?></span>
         </a>
         <a href="/ERP/inventory/adjustments" class="hub-card">
             <div class="hub-icon" style="background:#f3e8ff; color:#9333ea;"><i class="ph-duotone ph-scales"></i></div>
-            <span>التسويات</span>
+            <span><?= $t['card_adjustments'] ?></span>
         </a>
     </div>
 
     <div class="kpi-grid">
         <div class="kpi-card" style="--c-brand: #2563eb;">
             <div class="kpi-header">
-                <span class="kpi-label">قيمة المخزون التقديرية</span>
+                <span class="kpi-label"><?= $t['kpi_value'] ?></span>
                 <i class="ph-duotone ph-currency-circle-dollar" style="font-size:1.8rem; color:#2563eb;"></i>
             </div>
-            <div class="kpi-value"><?= number_format($kpis['stock_value'] ?? 0, 2) ?> <span style="font-size:0.8rem; color:var(--c-slate-muted);"><?= $currency ?></span></div>
+            <div class="kpi-value"><?= number_format($convert($kpis['stock_value'] ?? 0), 2) ?> <span style="font-size:0.8rem; color:var(--c-slate-muted);"><?= htmlspecialchars($currency) ?></span></div>
         </div>
 
         <div class="kpi-card" style="--c-brand: #059669;">
             <div class="kpi-header">
-                <span class="kpi-label">إجمالي الأصناف المسجلة</span>
+                <span class="kpi-label"><?= $t['kpi_products'] ?></span>
                 <i class="ph-duotone ph-barcode" style="font-size:1.8rem; color:#059669;"></i>
             </div>
-            <div class="kpi-value"><?= number_format($kpis['total_products'] ?? 0) ?></div>
+            <div class="kpi-value"><?= number_format((int)$kpis['total_products']) ?></div>
         </div>
 
         <div class="kpi-card" style="--c-brand: #9333ea;">
             <div class="kpi-header">
-                <span class="kpi-label">إجمالي الحركات المسجلة</span>
+                <span class="kpi-label"><?= $t['kpi_movements'] ?></span>
                 <i class="ph-duotone ph-arrows-down-up" style="font-size:1.8rem; color:#9333ea;"></i>
             </div>
-            <div class="kpi-value"><?= number_format($kpis['total_movements'] ?? 0) ?></div>
+            <div class="kpi-value"><?= number_format((int)$kpis['total_movements']) ?></div>
         </div>
 
         <div class="kpi-card" style="--c-brand: #ea580c;">
             <div class="kpi-header">
-                <span class="kpi-label">تحويلات قيد الانتظار</span>
+                <span class="kpi-label"><?= $t['kpi_pending'] ?></span>
                 <i class="ph-duotone ph-clock" style="font-size:1.8rem; color:#ea580c;"></i>
             </div>
-            <div class="kpi-value" style="color:#ea580c;"><?= number_format($kpis['pending_transfers'] ?? 0) ?></div>
+            <div class="kpi-value" style="color:#ea580c;"><?= number_format((int)$kpis['pending_transfers']) ?></div>
         </div>
     </div>
 
     <div class="grid-split">
         <div class="panel">
             <div class="panel-title">
-                <span><i class="ph-duotone ph-arrows-down-up" style="color:#2563eb;"></i> حجم التدفق المخزني (الوارد vs المنصرف)</span>
+                <span><i class="ph-duotone ph-arrows-down-up" style="color:#2563eb;"></i> <?= $t['chart_flow'] ?></span>
             </div>
             <div style="height: 260px; position: relative;">
                 <canvas id="flowChart"></canvas>
@@ -147,7 +207,7 @@ $recentDeliveries = $recentDeliveries ?? [];
 
         <div class="panel">
             <div class="panel-title">
-                <span><i class="ph-duotone ph-chart-pie-slice" style="color:#9333ea;"></i> توزيع أذون العمليات المخزنية</span>
+                <span><i class="ph-duotone ph-chart-pie-slice" style="color:#9333ea;"></i> <?= $t['chart_ops'] ?></span>
             </div>
             <div style="height: 260px; position: relative;">
                 <canvas id="opsChart"></canvas>
@@ -158,35 +218,39 @@ $recentDeliveries = $recentDeliveries ?? [];
     <div class="grid-split">
         <div class="panel">
             <div class="panel-title">
-                <span><i class="ph-duotone ph-clock-counter-clockwise" style="color:#059669;"></i> أحدث الحركات المخزنية</span>
-                <a href="/ERP/inventory/stock/ledger" style="font-size:0.8rem; color:#2563eb; text-decoration:none;">عرض الكل ➔</a>
+                <span><i class="ph-duotone ph-clock-counter-clockwise" style="color:#059669;"></i> <?= $t['tbl_moves_title'] ?></span>
+                <a href="/ERP/inventory/stock/ledger" style="font-size:0.8rem; color:#2563eb; text-decoration:none;"><?= $t['view_all'] ?></a>
             </div>
             <table class="dash-table" id="exportTableMovements">
                 <thead>
                     <tr>
-                        <th>الصنف</th>
-                        <th>المستودع</th>
-                        <th>نوع الحركة</th>
-                        <th style="text-align:center;">الكمية</th>
+                        <th><?= $t['col_branch'] ?></th>
+                        <th><?= $t['col_item'] ?></th>
+                        <th><?= $t['col_wh'] ?></th>
+                        <th><?= $t['col_type'] ?></th>
+                        <th style="text-align:center;"><?= $t['col_qty'] ?></th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php if(empty($recentMovements)): ?>
-                        <tr><td colspan="4" style="text-align:center; padding:20px; color:#94a3b8;">لا توجد حركات مسجلة مؤخراً</td></tr>
+                        <tr><td colspan="5" style="text-align:center; padding:20px; color:#94a3b8;"><?= $t['empty_moves'] ?></td></tr>
                     <?php else: foreach($recentMovements as $m): ?>
                         <tr>
+                            <td><span style="background:#f1f5f9; color:#475569; padding:2px 8px; border-radius:6px; font-size:0.75rem; font-weight:800; border:1px solid #e2e8f0;"><?= htmlspecialchars($m->branch_name ?? 'المركز الرئيسي') ?></span></td>
                             <td>
                                 <div><?= htmlspecialchars($m->product_name ?? '---') ?></div>
                                 <div style="font-family:monospace; color:#2563eb; font-size:0.75rem;"><?= htmlspecialchars($m->product_code ?? '---') ?></div>
                             </td>
                             <td><?= htmlspecialchars($m->warehouse_name ?? '---') ?></td>
                             <td>
-                                <span class="badge" style="background:<?= ($m->movement_type ?? '') === 'in' ? '#f0fdf4; color:#16a34a;' : '#fef2f2; color:#dc2626;' ?>">
-                                    <?= ($m->movement_type ?? '') === 'in' ? 'وارد (+)' : 'منصرف (-)' ?>
-                                </span>
+                                <?php if (($m->movement_type ?? '') === 'in'): ?>
+                                    <span class="badge" style="background:#f0fdf4; color:#16a34a;"><?= $t['in'] ?></span>
+                                <?php else: ?>
+                                    <span class="badge" style="background:#fef2f2; color:#dc2626;"><?= $t['out'] ?></span>
+                                <?php endif; ?>
                             </td>
                             <td style="text-align:center; font-family:monospace; font-weight:900; color:#0f172a;">
-                                <?= number_format($m->quantity ?? 0, 2) ?>
+                                <?= number_format((float)($m->quantity ?? 0), 2) ?>
                             </td>
                         </tr>
                     <?php endforeach; endif; ?>
@@ -196,29 +260,31 @@ $recentDeliveries = $recentDeliveries ?? [];
 
         <div class="panel">
             <div class="panel-title">
-                <span><i class="ph-duotone ph-truck" style="color:#ea580c;"></i> أحدث أذون التسليم (مبيعات)</span>
-                <a href="/ERP/inventory/delivery-notes" style="font-size:0.8rem; color:#2563eb; text-decoration:none;">عرض الكل ➔</a>
+                <span><i class="ph-duotone ph-truck" style="color:#ea580c;"></i> <?= $t['tbl_del_title'] ?></span>
+                <a href="/ERP/inventory/delivery-notes" style="font-size:0.8rem; color:#2563eb; text-decoration:none;"><?= $t['view_all'] ?></a>
             </div>
             <table class="dash-table">
                 <thead>
                     <tr>
-                        <th>رقم الإذن</th>
-                        <th>العميل</th>
-                        <th>التاريخ</th>
-                        <th style="text-align:center;">الحالة</th>
+                        <th><?= $t['col_branch'] ?></th>
+                        <th><?= $t['col_del_no'] ?></th>
+                        <th><?= $t['col_cust'] ?></th>
+                        <th><?= $t['col_date'] ?></th>
+                        <th style="text-align:center;"><?= $t['col_status'] ?></th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php if(empty($recentDeliveries)): ?>
-                        <tr><td colspan="4" style="text-align:center; padding:20px; color:#94a3b8;">لا توجد أذون تسليم حديثة</td></tr>
+                        <tr><td colspan="5" style="text-align:center; padding:20px; color:#94a3b8;"><?= $t['empty_del'] ?></td></tr>
                     <?php else: foreach($recentDeliveries as $dn): ?>
                         <tr>
+                            <td><span style="background:#f1f5f9; color:#475569; padding:2px 8px; border-radius:6px; font-size:0.75rem; font-weight:800; border:1px solid #e2e8f0;"><?= htmlspecialchars($dn->branch_name ?? 'المركز الرئيسي') ?></span></td>
                             <td style="font-family:monospace; font-weight:800; color:#2563eb;"><?= htmlspecialchars($dn->delivery_number ?? '---') ?></td>
                             <td><?= htmlspecialchars($dn->customer_name ?? '---') ?></td>
                             <td><?= htmlspecialchars($dn->delivery_date ?? '---') ?></td>
                             <td style="text-align:center;">
                                 <span class="badge" style="background:#eff6ff; color:#2563eb; border:1px solid #bfdbfe;">
-                                    <?= htmlspecialchars($dn->status ?? 'draft') ?>
+                                    <?= ($dn->status ?? 'draft') === 'delivered' ? $t['status_delivered'] : $t['status_draft'] ?>
                                 </span>
                             </td>
                         </tr>
@@ -233,12 +299,18 @@ $recentDeliveries = $recentDeliveries ?? [];
 document.addEventListener("DOMContentLoaded", function() {
     Chart.defaults.font.family = "'Cairo', 'Inter', sans-serif";
 
-    // Chart 1
-    const ctxFlow = document.getElementById('flowChart').getContext('2d');
+    var flowInText = "<?= $t['chart_flow_in'] ?>";
+    var flowOutText = "<?= $t['chart_flow_out'] ?>";
+    var opsTransfers = "<?= $t['ops_transfers'] ?>";
+    var opsDel = "<?= $t['ops_deliveries'] ?>";
+    var opsRet = "<?= $t['ops_returns'] ?>";
+    var opsAdj = "<?= $t['ops_adj'] ?>";
+
+    var ctxFlow = document.getElementById('flowChart').getContext('2d');
     new Chart(ctxFlow, {
         type: 'bar',
         data: {
-            labels: ['إجمالي الوارد (+)', 'إجمالي المنصرف (-)'],
+            labels: [flowInText, flowOutText],
             datasets: [{
                 data: [<?= (float)($chartData['movements_in'] ?? 0) ?>, <?= (float)($chartData['movements_out'] ?? 0) ?>],
                 backgroundColor: ['#16a34a', '#dc2626'],
@@ -254,12 +326,11 @@ document.addEventListener("DOMContentLoaded", function() {
         }
     });
 
-    // Chart 2
-    const ctxOps = document.getElementById('opsChart').getContext('2d');
+    var ctxOps = document.getElementById('opsChart').getContext('2d');
     new Chart(ctxOps, {
         type: 'doughnut',
         data: {
-            labels: ['تحويلات', 'أذون تسليم', 'مرتجعات', 'تسويات'],
+            labels: [opsTransfers, opsDel, opsRet, opsAdj],
             datasets: [{
                 data: [
                     <?= (int)($chartData['ops_breakdown']['transfers'] ?? 0) ?>,
@@ -281,25 +352,30 @@ document.addEventListener("DOMContentLoaded", function() {
 });
 
 function exportToExcel() {
-    let table = document.getElementById("exportTableMovements");
-    let rows = [];
+    var table = document.getElementById("exportTableMovements");
+    var rows = [];
     
-    rows.push(["تقرير حركات المخزون - Nour Trust ERP"]);
+    rows.push(["<?= $t['tbl_moves_title'] ?>"]);
     rows.push([]);
-    rows.push(["الصنف", "المستودع", "نوع الحركة", "الكمية"]);
+    rows.push(["<?= $t['col_branch'] ?>", "<?= $t['col_item'] ?>", "<?= $t['col_wh'] ?>", "<?= $t['col_type'] ?>", "<?= $t['col_qty'] ?>"]);
 
-    for (let row of table.rows) {
+    for (var i = 0; i < table.rows.length; i++) {
+        var row = table.rows[i];
         if(row.parentElement.tagName === 'THEAD') continue;
-        let cols = Array.from(row.cells).map(cell => '"' + cell.innerText.replace(/\n/g, ' ') + '"');
+        
+        var cols = [];
+        for (var j = 0; j < row.cells.length; j++) {
+            cols.push('"' + row.cells[j].innerText.replace(/\n/g, ' ') + '"');
+        }
         if(cols.length > 0) rows.push(cols);
     }
 
-    let csvContent = "\uFEFF" + rows.map(e => e.join(",")).join("\n");
-    let blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    let url = URL.createObjectURL(blob);
-    let link = document.createElement("a");
+    var csvContent = "\uFEFF" + rows.map(function(e) { return e.join(","); }).join("\n");
+    var blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    var url = URL.createObjectURL(blob);
+    var link = document.createElement("a");
     link.setAttribute("href", url);
-    link.setAttribute("download", "Inventory_Dashboard_Report_" + new Date().toISOString().slice(0,10) + ".csv");
+    link.setAttribute("download", "Inventory_Dashboard_<?= date('Y-m-d') ?>.csv");
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);

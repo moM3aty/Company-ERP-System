@@ -4,16 +4,46 @@
 if (session_status() === PHP_SESSION_NONE) session_start();
 $isRtl = ($_SESSION['locale'] ?? 'ar') === 'ar';
 $isEdit = isset($transfer) && $transfer !== null && !empty($transfer->id);
-$actionUrl = $isEdit ? "/ERP/inventory/stock/transfers/{$transfer->id}/update" : "/ERP/inventory/stock/transfers/store";
+$actionUrl = $isEdit ? "/ERP/inventory/stock/transfers/" . (int)$transfer->id . "/update" : "/ERP/inventory/stock/transfers/store";
+
+$activeBranchName = $_SESSION['active_branch_name'] ?? ($isRtl ? 'كل الفروع' : 'All Branches');
+
+$t = [
+    'ar' => [
+        'title_new' => 'إصدار أمر تحويل جديد', 'title_edit' => 'تعديل أمر التحويل',
+        'panel_route' => 'مسار التحويل', 'from_wh' => 'من مستودع (المصدر)', 'choose_from' => '-- اختر مستودع الصرف --',
+        'to_wh' => 'إلى مستودع (الوجهة)', 'choose_to' => '-- اختر مستودع الاستلام --',
+        'num' => 'رقم أمر التحويل', 'date' => 'تاريخ التحويل', 'status' => 'حالة التحويل',
+        'status_draft' => 'مسودة (لم يتم النقل)', 'status_transit' => 'قيد النقل (في الطريق)', 'status_completed' => 'مستلم ومكتمل (نهائي)',
+        'notes' => 'ملاحظات التحويل', 'notes_ph' => 'بوليصة الشحن، اسم السائق...',
+        'panel_items' => 'الأصناف المحولة', 'add_item' => 'إضافة صنف',
+        'col_item' => 'الصنف (الكود والاسم)', 'choose_item' => '-- اختر الصنف --', 'col_qty' => 'الكمية', 'col_remove' => 'إزالة',
+        'cancel' => 'إلغاء وتراجع', 'save' => 'حفظ وإصدار التحويل', 'update' => 'تحديث البيانات',
+        'active_scope' => 'الفرع النشط:'
+    ],
+    'en' => [
+        'title_new' => 'Issue New Stock Transfer', 'title_edit' => 'Edit Stock Transfer',
+        'panel_route' => 'Transfer Route', 'from_wh' => 'From Warehouse (Source)', 'choose_from' => '-- Select Source Warehouse --',
+        'to_wh' => 'To Warehouse (Destination)', 'choose_to' => '-- Select Destination Warehouse --',
+        'num' => 'Transfer Number', 'date' => 'Transfer Date', 'status' => 'Transfer Status',
+        'status_draft' => 'Draft (Pending)', 'status_transit' => 'In Transit', 'status_completed' => 'Completed & Received',
+        'notes' => 'Transfer Notes', 'notes_ph' => 'Waybill no, driver name...',
+        'panel_items' => 'Transferred Items', 'add_item' => 'Add Item',
+        'col_item' => 'Item (Code & Name)', 'choose_item' => '-- Select Item --', 'col_qty' => 'Quantity', 'col_remove' => 'Remove',
+        'cancel' => 'Cancel', 'save' => 'Save & Issue Transfer', 'update' => 'Update Data',
+        'active_scope' => 'Active Branch:'
+    ]
+][$isRtl ? 'ar' : 'en'];
 ?>
 
 <style>
     :root { --c-amber: #f59e0b; --c-amber-dark: #d97706; --c-border: #cbd5e1; --c-bg: #f8fafc; }
     .form-wrapper { max-width: 950px; margin: 0 auto; padding-bottom: 80px; font-family: <?= $isRtl ? "'Cairo', sans-serif" : "'Inter', sans-serif" ?>; }
-    .form-header { display: flex; align-items: center; gap: 16px; margin-bottom: 24px; border-bottom: 1px solid #e2e8f0; padding-bottom: 16px; }
+    .form-header { display: flex; align-items: center; gap: 16px; margin-bottom: 16px; border-bottom: 1px solid #e2e8f0; padding-bottom: 16px; }
     .back-btn { width: 42px; height: 42px; border-radius: 12px; background: #ffffff; border: 1px solid var(--c-border); display: inline-flex; align-items: center; justify-content: center; text-decoration: none; color: #64748b; }
+    .branch-scope-badge { display: inline-flex; align-items: center; gap: 8px; background: #f8fafc; border: 1px solid var(--c-border); padding: 6px 14px; border-radius: 20px; font-size: 0.8rem; font-weight: 800; color: #0f172a; margin-bottom: 20px; }
     .panel-card { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 18px; padding: 28px; margin-bottom: 24px; border-top: 4px solid var(--c-amber); }
-    .form-control { width: 100%; padding: 12px 16px; border: 1px solid var(--c-border); border-radius: 10px; font-family: inherit; font-size: 0.95rem; background: var(--c-bg); color: #0f172a; }
+    .form-control { width: 100%; padding: 12px 16px; border: 1px solid var(--c-border); border-radius: 10px; font-family: inherit; font-size: 0.95rem; background: var(--c-bg); color: #0f172a; box-sizing: border-box; }
     .input-label { font-size: 0.85rem; font-weight: 800; margin-bottom: 8px; display: block; color: #475569; }
     .grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px; }
     .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
@@ -29,33 +59,41 @@ $actionUrl = $isEdit ? "/ERP/inventory/stock/transfers/{$transfer->id}/update" :
 
 <div class="form-wrapper" dir="<?= $isRtl ? 'rtl' : 'ltr' ?>">
     <div class="form-header">
-        <a href="/ERP/inventory/stock/transfers" class="back-btn"><i class="ph-bold ph-arrow-right"></i></a>
-        <h2 style="margin:0; font-size:1.6rem; color:#0f172a; font-weight:800;"><?= $isEdit ? 'تعديل أمر التحويل' : 'إصدار أمر تحويل جديد' ?></h2>
+        <a href="/ERP/inventory/stock/transfers" class="back-btn"><i class="ph-bold <?= $isRtl ? 'ph-arrow-right' : 'ph-arrow-left' ?>"></i></a>
+        <h2 style="margin:0; font-size:1.6rem; color:#0f172a; font-weight:800;"><?= $isEdit ? $t['title_edit'] : $t['title_new'] ?></h2>
+    </div>
+
+    <div>
+        <div class="branch-scope-badge">
+            <i class="ph-bold ph-storefront" style="color:var(--c-amber);"></i>
+            <span><?= $t['active_scope'] ?></span>
+            <span style="color:var(--c-amber); font-weight:900;"><?= htmlspecialchars($activeBranchName) ?></span>
+        </div>
     </div>
 
     <?php if(isset($_SESSION['flash_err'])): ?>
-        <div style="background: #fef2f2; color: #dc2626; padding: 16px; border-radius: 12px; margin-bottom: 24px; border: 1px solid #fecaca; font-weight:bold;"><i class="ph-bold ph-warning-circle"></i> <?= $_SESSION['flash_err']; unset($_SESSION['flash_err']); ?></div>
+        <div style="background: #fef2f2; color: #dc2626; padding: 16px; border-radius: 12px; margin-bottom: 24px; border: 1px solid #fecaca; font-weight:bold;"><i class="ph-bold ph-warning-circle"></i> <?= htmlspecialchars($_SESSION['flash_err']); unset($_SESSION['flash_err']); ?></div>
     <?php endif; ?>
 
     <form action="<?= $actionUrl ?>" method="POST" id="transferForm">
         <div class="panel-card">
-            <h3 style="margin: 0 0 20px 0; border-bottom: 1px solid #f1f5f9; padding-bottom: 10px; font-size:1.1rem; font-weight:800; color:#0f172a;"><i class="ph-duotone ph-map-pin" style="color:var(--c-amber);"></i> مسار التحويل</h3>
+            <h3 style="margin: 0 0 20px 0; border-bottom: 1px solid #f1f5f9; padding-bottom: 10px; font-size:1.1rem; font-weight:800; color:#0f172a;"><i class="ph-duotone ph-map-pin" style="color:var(--c-amber);"></i> <?= $t['panel_route'] ?></h3>
             <div class="grid-2">
                 <div>
-                    <label class="input-label">من مستودع (المصدر) <span style="color:red">*</span></label>
+                    <label class="input-label"><?= $t['from_wh'] ?> <span style="color:red">*</span></label>
                     <select name="from_warehouse_id" id="from_wh" class="form-control" required>
-                        <option value="">-- اختر مستودع الصرف --</option>
-                        <?php foreach($warehouses ?? [] as $w): ?>
-                            <option value="<?= $w->id ?>" <?= ($isEdit && $transfer->from_warehouse_id == $w->id) ? 'selected' : '' ?>><?= htmlspecialchars($w->name_ar) ?></option>
+                        <option value=""><?= $t['choose_from'] ?></option>
+                        <?php foreach($warehouses ?? [] as $w): $wName = $isRtl ? ($w->name_ar ?? '') : ($w->name_en ?: ($w->name_ar ?? '')); ?>
+                            <option value="<?= $w->id ?>" <?= ($isEdit && ($transfer->from_warehouse_id ?? 0) == $w->id) ? 'selected' : '' ?>><?= htmlspecialchars($wName) ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>
                 <div>
-                    <label class="input-label">إلى مستودع (الوجهة) <span style="color:red">*</span></label>
+                    <label class="input-label"><?= $t['to_wh'] ?> <span style="color:red">*</span></label>
                     <select name="to_warehouse_id" id="to_wh" class="form-control" required>
-                        <option value="">-- اختر مستودع الاستلام --</option>
-                        <?php foreach($warehouses ?? [] as $w): ?>
-                            <option value="<?= $w->id ?>" <?= ($isEdit && $transfer->to_warehouse_id == $w->id) ? 'selected' : '' ?>><?= htmlspecialchars($w->name_ar) ?></option>
+                        <option value=""><?= $t['choose_to'] ?></option>
+                        <?php foreach($warehouses ?? [] as $w): $wName = $isRtl ? ($w->name_ar ?? '') : ($w->name_en ?: ($w->name_ar ?? '')); ?>
+                            <option value="<?= $w->id ?>" <?= ($isEdit && ($transfer->to_warehouse_id ?? 0) == $w->id) ? 'selected' : '' ?>><?= htmlspecialchars($wName) ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>
@@ -63,42 +101,42 @@ $actionUrl = $isEdit ? "/ERP/inventory/stock/transfers/{$transfer->id}/update" :
 
             <div class="grid-3" style="margin-top: 24px;">
                 <div>
-                    <label class="input-label">رقم أمر التحويل</label>
-                    <input type="text" name="transfer_number" class="form-control" style="font-family:monospace; font-weight:bold; color:var(--c-amber-dark);" value="<?= $isEdit ? htmlspecialchars($transfer->transfer_number) : '' ?>" readonly placeholder="تلقائي">
+                    <label class="input-label"><?= $t['num'] ?></label>
+                    <input type="text" name="transfer_number" class="form-control" style="font-family:monospace; font-weight:bold; color:var(--c-amber-dark);" value="<?= $isEdit ? htmlspecialchars((string)($transfer->transfer_number ?? '')) : '' ?>" readonly placeholder="Auto">
                 </div>
                 <div>
-                    <label class="input-label">تاريخ التحويل <span style="color:red">*</span></label>
-                    <input type="date" name="transfer_date" class="form-control" value="<?= $isEdit ? htmlspecialchars($transfer->transfer_date) : date('Y-m-d') ?>" required>
+                    <label class="input-label"><?= $t['date'] ?> <span style="color:red">*</span></label>
+                    <input type="date" name="transfer_date" class="form-control" value="<?= $isEdit ? htmlspecialchars((string)($transfer->transfer_date ?? '')) : date('Y-m-d') ?>" required>
                 </div>
                 <div>
-                    <label class="input-label">حالة التحويل</label>
+                    <label class="input-label"><?= $t['status'] ?></label>
                     <select name="status" class="form-control" style="font-weight: 800;">
-                        <?php $st = $isEdit ? $transfer->status : 'draft'; ?>
-                        <option value="draft" <?= $st=='draft' ? 'selected' : '' ?>>مسودة (لم يتم النقل)</option>
-                        <option value="in_transit" <?= $st=='in_transit' ? 'selected' : '' ?>>قيد النقل (في الطريق)</option>
-                        <option value="completed" <?= $st=='completed' ? 'selected' : '' ?>>مستلم ومكتمل (نهائي)</option>
+                        <?php $st = $isEdit ? ($transfer->status ?? 'draft') : 'draft'; ?>
+                        <option value="draft" <?= $st=='draft' ? 'selected' : '' ?>><?= $t['status_draft'] ?></option>
+                        <option value="in_transit" <?= $st=='in_transit' ? 'selected' : '' ?>><?= $t['status_transit'] ?></option>
+                        <option value="completed" <?= $st=='completed' ? 'selected' : '' ?>><?= $t['status_completed'] ?></option>
                     </select>
                 </div>
             </div>
             
             <div style="margin-top: 24px;">
-                <label class="input-label">ملاحظات التحويل</label>
-                <input type="text" name="notes" class="form-control" value="<?= $isEdit ? htmlspecialchars($transfer->notes ?? '') : '' ?>" placeholder="بوليصة الشحن، اسم السائق...">
+                <label class="input-label"><?= $t['notes'] ?></label>
+                <input type="text" name="notes" class="form-control" value="<?= $isEdit ? htmlspecialchars((string)($transfer->notes ?? '')) : '' ?>" placeholder="<?= $t['notes_ph'] ?>">
             </div>
         </div>
 
         <div class="panel-card">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                <h3 style="margin:0; font-size:1.1rem; font-weight:800; color:#0f172a;"><i class="ph-duotone ph-list-numbers" style="color:var(--c-amber);"></i> الأصناف المحولة</h3>
-                <button type="button" onclick="addRow()" class="btn-add-row"><i class="ph-bold ph-plus"></i> إضافة صنف</button>
+                <h3 style="margin:0; font-size:1.1rem; font-weight:800; color:#0f172a;"><i class="ph-duotone ph-list-numbers" style="color:var(--c-amber);"></i> <?= $t['panel_items'] ?></h3>
+                <button type="button" onclick="addRow()" class="btn-add-row"><i class="ph-bold ph-plus"></i> <?= $t['add_item'] ?></button>
             </div>
             
             <table class="items-table" id="itemsTable">
                 <thead>
                     <tr>
-                        <th style="width: 70%;">الصنف (الكود والاسم) <span style="color:red">*</span></th>
-                        <th style="width: 20%; text-align: center;">الكمية <span style="color:red">*</span></th>
-                        <th style="width: 10%; text-align: center;">إزالة</th>
+                        <th style="width: 70%;"><?= $t['col_item'] ?> <span style="color:red">*</span></th>
+                        <th style="width: 20%; text-align: center;"><?= $t['col_qty'] ?> <span style="color:red">*</span></th>
+                        <th style="width: 10%; text-align: center;"><?= $t['col_remove'] ?></th>
                     </tr>
                 </thead>
                 <tbody id="itemsBody">
@@ -106,13 +144,13 @@ $actionUrl = $isEdit ? "/ERP/inventory/stock/transfers/{$transfer->id}/update" :
                         <tr>
                             <td>
                                 <select name="product_id[]" class="form-control" required>
-                                    <option value="">-- اختر الصنف --</option>
-                                    <?php foreach($products ?? [] as $p): ?>
-                                        <option value="<?= $p->id ?>" <?= $item->product_id == $p->id ? 'selected' : '' ?>><?= htmlspecialchars($p->code) ?> - <?= htmlspecialchars($p->name_ar) ?></option>
+                                    <option value=""><?= $t['choose_item'] ?></option>
+                                    <?php foreach($products ?? [] as $p): $pName = $isRtl ? ($p->name_ar ?? '') : ($p->name_en ?: ($p->name_ar ?? '')); ?>
+                                        <option value="<?= $p->id ?>" <?= ($item->product_id ?? 0) == $p->id ? 'selected' : '' ?>><?= htmlspecialchars($p->code) ?> - <?= htmlspecialchars($pName) ?></option>
                                     <?php endforeach; ?>
                                 </select>
                             </td>
-                            <td><input type="number" step="0.01" name="quantity[]" class="form-control" style="text-align:center; font-weight:900; font-family:monospace; font-size:1.1rem; color:var(--c-amber-dark);" value="<?= $item->quantity ?>" required></td>
+                            <td><input type="number" step="0.01" name="quantity[]" class="form-control" style="text-align:center; font-weight:900; font-family:monospace; font-size:1.1rem; color:var(--c-amber-dark);" value="<?= (float)($item->quantity ?? 1) ?>" required></td>
                             <td style="text-align:center;"><button type="button" class="btn-remove-row" onclick="this.closest('tr').remove();"><i class="ph-bold ph-trash"></i></button></td>
                         </tr>
                     <?php endforeach; endif; ?>
@@ -121,8 +159,8 @@ $actionUrl = $isEdit ? "/ERP/inventory/stock/transfers/{$transfer->id}/update" :
         </div>
 
         <div class="sticky-footer">
-            <a href="/ERP/inventory/stock/transfers" class="btn-cancel">إلغاء وتراجع</a>
-            <button type="submit" class="btn-submit"><i class="ph-bold ph-floppy-disk"></i> <?= $isEdit ? 'تحديث البيانات' : 'حفظ وإصدار التحويل' ?></button>
+            <a href="/ERP/inventory/stock/transfers" class="btn-cancel"><?= $t['cancel'] ?></a>
+            <button type="submit" class="btn-submit"><i class="ph-bold ph-floppy-disk"></i> <?= $isEdit ? $t['update'] : $t['save'] ?></button>
         </div>
     </form>
 </div>
@@ -131,9 +169,9 @@ $actionUrl = $isEdit ? "/ERP/inventory/stock/transfers/{$transfer->id}/update" :
     <tr>
         <td>
             <select name="product_id[]" class="form-control" required>
-                <option value="">-- اختر الصنف --</option>
-                <?php foreach($products ?? [] as $p): ?>
-                    <option value="<?= $p->id ?>"><?= htmlspecialchars($p->code) ?> - <?= htmlspecialchars($p->name_ar) ?></option>
+                <option value=""><?= $t['choose_item'] ?></option>
+                <?php foreach($products ?? [] as $p): $pName = $isRtl ? ($p->name_ar ?? '') : ($p->name_en ?: ($p->name_ar ?? '')); ?>
+                    <option value="<?= $p->id ?>"><?= htmlspecialchars($p->code) ?> - <?= htmlspecialchars($pName) ?></option>
                 <?php endforeach; ?>
             </select>
         </td>
@@ -158,7 +196,7 @@ document.getElementById('transferForm').addEventListener('submit', function(e) {
     const toWh = document.getElementById('to_wh').value;
     if(fromWh && toWh && fromWh === toWh) {
         e.preventDefault(); 
-        alert("خطأ: لا يمكن اختيار نفس المستودع للمصدر والوجهة!");
+        alert("<?= $isRtl ? 'خطأ: لا يمكن اختيار نفس المستودع للمصدر والوجهة!' : 'Error: From and To warehouses cannot be the same!' ?>");
     }
 });
 </script>

@@ -15,7 +15,7 @@ use Throwable;
 class CostCenterController extends Controller
 {
     private string $basePath;
-    private PDO $db;
+    private ?PDO $db = null;
 
     public function __construct()
     {
@@ -26,7 +26,9 @@ class CostCenterController extends Controller
         $this->basePath = $basePath ?? dirname(__DIR__, 4);
         if ($app && $app->has(PDO::class)) {
             $this->db = $app->get(PDO::class);
-            $this->db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+            if ($this->db) {
+                $this->db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+            }
         }
     }
 
@@ -38,123 +40,202 @@ class CostCenterController extends Controller
         return null;
     }
 
+    private function hasBranchesSupport(): bool 
+    {
+        if (!$this->db) return false;
+        try {
+            $this->db->query("SELECT branch_id FROM cost_centers LIMIT 1");
+            $this->db->query("SELECT id FROM branches LIMIT 1");
+            return true;
+        } catch (Throwable $e) {
+            return false;
+        }
+    }
+
+    private function getTenantCondition(string $alias = '', string $table = 'cost_centers'): string 
+    {
+        if (session_status() === PHP_SESSION_NONE) session_start();
+        $companyId = (int)($_SESSION['company_id'] ?? 1);
+        $branchId  = (int)($_SESSION['branch_id'] ?? 0);
+        
+        $prefix = $alias ? $alias . '.' : '';
+        $cond = "({$prefix}company_id = {$companyId} OR {$prefix}company_id IS NULL OR {$prefix}company_id = 0)";
+        
+        if ($this->hasBranchesSupport() && $branchId > 0) {
+            $cond .= " AND ({$prefix}branch_id = {$branchId} OR {$prefix}branch_id IS NULL OR {$prefix}branch_id = 0)";
+        }
+        return $cond;
+    }
+
     public function index(Request $request, Response $response): Response
     {
-        if (class_exists('\Core\Security\Auth')) Auth::enforce('accounting_cost_centers_view');
+        if (class_exists('\Core\Security\Auth') && method_exists('\Core\Security\Auth', 'enforce')) {
+            Auth::enforce('accounting_cost_centers_view');
+        }
 
         $uri = $_SERVER['REQUEST_URI'] ?? '';
         if (preg_match('#/cost-centers/(\d+)/edit#', $uri, $m)) return $this->edit($request, $response, (int)$m[1]);
         if (preg_match('#/cost-centers/(\d+)/update#', $uri, $m)) return $this->update($request, $response, (int)$m[1]);
         if (preg_match('#/cost-centers/(\d+)/delete#', $uri, $m)) return $this->delete($request, $response, (int)$m[1]);
         if (preg_match('#/cost-centers/(\d+)/report#', $uri, $m)) return $this->report($request, $response, (int)$m[1]);
-        if (preg_match('#/cost-centers/(\d+)$#', $uri, $m)) return $this->show($request, $response, (int)$m[1]);
 
         $search = trim($_GET['search'] ?? '');
         $statusFilter = trim($_GET['status'] ?? '');
+        $branchFilter = trim($_GET['branch_id'] ?? '');
         $page = max(1, (int)($_GET['page'] ?? 1));
         $limit = 15;
         $offset = ($page - 1) * $limit;
 
-        try {
-            // Multi-Tenancy: Filter by active company
-            $companyId = current_company() ?? 1;
-            $where = ["c.company_id = ?"];
-            $params = [$companyId];
+        $tenantCond = $this->getTenantCondition('c', 'cost_centers');
+        $hasBranch = $this->hasBranchesSupport();
+        
+        $convert = function($amt) { return function_exists('convert_amount') ? convert_amount((float)$amt) : (float)$amt; };
 
-            if ($search !== '') {
-                $where[] = "(c.code LIKE ? OR c.name_ar LIKE ? OR c.name_en LIKE ?)";
-                $like = "%{$search}%";
-                $params = array_merge($params, [$like, $like, $like]);
+        $centers = []; $branches = []; $dbErrors = [];
+        $stats = (object)['total_centers'=>0, 'parent_centers'=>0, 'sub_centers'=>0, 'active_centers'=>0];
+        $totalPages = 1;
+
+        if ($this->db) {
+            try {
+                $companyId = (int)($_SESSION['company_id'] ?? 1);
+                
+                if ($hasBranch) {
+                    $branches = $this->db->query("SELECT id, name_ar, name_en FROM branches WHERE company_id = $companyId AND is_active = 1")->fetchAll(PDO::FETCH_OBJ) ?: [];
+                }
+
+                $where = [$tenantCond];
+                $params = [];
+
+                if ($search !== '') {
+                    $where[] = "(c.code LIKE ? OR c.name_ar LIKE ? OR c.name_en LIKE ?)";
+                    $like = "%{$search}%";
+                    $params = array_merge($params, [$like, $like, $like]);
+                }
+                if ($statusFilter !== '') {
+                    $where[] = "c.is_active = ?";
+                    $params[] = ($statusFilter === 'active') ? 1 : 0;
+                }
+                if ($hasBranch && $branchFilter !== '') {
+                    $where[] = "c.branch_id = ?";
+                    $params[] = (int)$branchFilter;
+                }
+
+                $whereSql = "WHERE " . implode(" AND ", $where);
+
+                $countStmt = $this->db->prepare("SELECT COUNT(*) FROM cost_centers c $whereSql");
+                $countStmt->execute($params);
+                $totalPages = max(1, ceil($countStmt->fetchColumn() / $limit));
+
+                $branchSelect = $hasBranch ? ", b.name_ar as branch_name, b.name_en as branch_name_en" : "";
+                $branchJoin   = $hasBranch ? "LEFT JOIN branches b ON c.branch_id = b.id" : "";
+
+                $stmt = $this->db->prepare("
+                    SELECT c.*, p.name_ar as parent_name, p.code as parent_code $branchSelect
+                    FROM cost_centers c
+                    LEFT JOIN cost_centers p ON c.parent_id = p.id
+                    $branchJoin
+                    $whereSql
+                    ORDER BY c.code ASC LIMIT $limit OFFSET $offset
+                ");
+                $stmt->execute($params);
+                $centers = $stmt->fetchAll(PDO::FETCH_OBJ) ?: [];
+
+                foreach ($centers as $cen) {
+                    $cen->budget_amount = $convert($cen->budget_amount);
+                }
+
+                $statsData = $this->db->query("
+                    SELECT 
+                        COUNT(*) as total_centers,
+                        SUM(IF(is_parent = 1, 1, 0)) as parent_centers,
+                        SUM(IF(is_parent = 0, 1, 0)) as sub_centers,
+                        SUM(IF(is_active = 1, 1, 0)) as active_centers
+                    FROM cost_centers c WHERE $tenantCond
+                ")->fetch(PDO::FETCH_OBJ);
+                if ($statsData) $stats = $statsData;
+
+            } catch (Throwable $e) {
+                $dbErrors[] = $e->getMessage();
             }
-            if ($statusFilter !== '') {
-                $where[] = "c.is_active = ?";
-                $params[] = ($statusFilter === 'active') ? 1 : 0;
-            }
-
-            $whereSql = "WHERE " . implode(" AND ", $where);
-
-            $countStmt = $this->db->prepare("SELECT COUNT(*) FROM cost_centers c $whereSql");
-            $countStmt->execute($params);
-            $totalPages = max(1, ceil($countStmt->fetchColumn() / $limit));
-
-            $stmt = $this->db->prepare("
-                SELECT c.*, p.name_ar as parent_name, p.code as parent_code
-                FROM cost_centers c
-                LEFT JOIN cost_centers p ON c.parent_id = p.id
-                $whereSql
-                ORDER BY c.code ASC LIMIT $limit OFFSET $offset
-            ");
-            $stmt->execute($params);
-            $centers = $stmt->fetchAll(PDO::FETCH_OBJ) ?: [];
-
-            $statsStmt = $this->db->prepare("
-                SELECT 
-                    COUNT(*) as total_centers,
-                    SUM(IF(is_parent = 1, 1, 0)) as parent_centers,
-                    SUM(IF(is_parent = 0, 1, 0)) as sub_centers,
-                    SUM(IF(is_active = 1, 1, 0)) as active_centers
-                FROM cost_centers WHERE company_id = ?
-            ");
-            $statsStmt->execute([$companyId]);
-            $stats = $statsStmt->fetch(PDO::FETCH_OBJ);
-
-        } catch (Throwable $e) {
-            $centers = [];
-            $stats = (object)['total_centers'=>0, 'parent_centers'=>0, 'sub_centers'=>0, 'active_centers'=>0];
-            $totalPages = 1;
         }
 
         $currentPage = $page;
-        ob_start(); include $this->basePath . '/resources/views/accounting/cost_centers/index.php';
-        $content = ob_get_clean();
-        ob_start(); include $this->basePath . '/resources/views/layouts/app.php';
-        return $response->setContent(ob_get_clean())->setHeader('Content-Type', 'text/html');
+        return $this->renderView('/resources/views/accounting/cost_centers/index.php', compact(
+            'centers', 'branches', 'stats', 'totalPages', 'currentPage', 'search', 'statusFilter', 'branchFilter', 'dbErrors'
+        ), $response);
     }
 
     public function create(Request $request, Response $response): Response
     {
-        if (class_exists('\Core\Security\Auth')) Auth::enforce('accounting_cost_centers_create');
+        if (class_exists('\Core\Security\Auth') && method_exists('\Core\Security\Auth', 'enforce')) {
+            Auth::enforce('accounting_cost_centers_create');
+        }
 
-        $center = null; $parentCenters = [];
-        try {
-            $companyId = current_company() ?? 1;
-            $parentCenters = $this->db->query("SELECT id, code, name_ar FROM cost_centers WHERE is_parent = 1 AND company_id = {$companyId} ORDER BY code ASC")->fetchAll(PDO::FETCH_OBJ);
-        } catch (Throwable $e) {}
+        $center = null; $parentCenters = []; $branches = [];
+        $tenantCond = $this->getTenantCondition('c', 'cost_centers');
+        $hasBranch = $this->hasBranchesSupport();
 
-        ob_start(); include $this->basePath . '/resources/views/accounting/cost_centers/create.php';
-        $content = ob_get_clean();
-        ob_start(); include $this->basePath . '/resources/views/layouts/app.php';
-        return $response->setContent(ob_get_clean())->setHeader('Content-Type', 'text/html');
+        if ($this->db) {
+            try {
+                $companyId = (int)($_SESSION['company_id'] ?? 1);
+                if ($hasBranch) {
+                    $branches = $this->db->query("SELECT id, name_ar, name_en FROM branches WHERE company_id = $companyId AND is_active = 1")->fetchAll(PDO::FETCH_OBJ) ?: [];
+                }
+                $parentCenters = $this->db->query("
+                    SELECT id, code, name_ar, name_en 
+                    FROM cost_centers c 
+                    WHERE is_parent = 1 AND $tenantCond 
+                    ORDER BY code ASC
+                ")->fetchAll(PDO::FETCH_OBJ) ?: [];
+            } catch (Throwable $e) {}
+        }
+
+        return $this->renderView('/resources/views/accounting/cost_centers/create.php', compact('center', 'parentCenters', 'branches'), $response);
     }
 
     public function store(Request $request, Response $response): Response
     {
-        if (class_exists('\Core\Security\Auth')) Auth::enforce('accounting_cost_centers_create');
+        if (class_exists('\Core\Security\Auth') && method_exists('\Core\Security\Auth', 'enforce')) {
+            Auth::enforce('accounting_cost_centers_create');
+        }
 
         $data = $_POST;
         if (session_status() === PHP_SESSION_NONE) session_start();
+        $companyId = (int)($_SESSION['company_id'] ?? 1);
+        $sessionBranch = (int)($_SESSION['branch_id'] ?? 0);
+        $branchId = ($sessionBranch > 0) ? $sessionBranch : (!empty($data['branch_id']) ? (int)$data['branch_id'] : 0);
 
         try {
-            if (empty($data['code']) || empty($data['name_ar'])) {
-                throw new Exception(__('يرجى تعبئة الحقول الإلزامية.', 'Please fill the required fields.'));
-            }
+            if (!$this->db) throw new Exception("اتصال قاعدة البيانات غير متوفر.");
+            if (empty($data['code']) || empty($data['name_ar'])) throw new Exception("يرجى تعبئة الحقول الإلزامية.");
 
-            $companyId = current_company() ?? 1;
             $parentId = !empty($data['parent_id']) ? (int)$data['parent_id'] : null;
             $budget = !empty($data['budget_amount']) ? (float)$data['budget_amount'] : 0.00;
             $isParent = isset($data['is_parent']) ? 1 : 0;
             $isActive = isset($data['is_active']) ? 1 : 0;
 
-            $stmt = $this->db->prepare("
-                INSERT INTO cost_centers (company_id, code, name_ar, name_en, budget_amount, parent_id, is_parent, is_active)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            ");
-            $stmt->execute([
-                $companyId, trim($data['code']), trim($data['name_ar']), trim($data['name_en'] ?? ''), $budget,
-                $parentId, $isParent, $isActive
-            ]);
+            try {
+                $stmt = $this->db->prepare("
+                    INSERT INTO cost_centers (company_id, branch_id, code, name_ar, name_en, budget_amount, parent_id, is_parent, is_active)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ");
+                $stmt->execute([
+                    $companyId, $branchId, trim($data['code']), trim($data['name_ar']), trim($data['name_en'] ?? ''), 
+                    $budget, $parentId, $isParent, $isActive
+                ]);
+            } catch (\PDOException $ex) {
+                // Fallback for missing branch_id
+                $stmt = $this->db->prepare("
+                    INSERT INTO cost_centers (company_id, code, name_ar, name_en, budget_amount, parent_id, is_parent, is_active)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ");
+                $stmt->execute([
+                    $companyId, trim($data['code']), trim($data['name_ar']), trim($data['name_en'] ?? ''), 
+                    $budget, $parentId, $isParent, $isActive
+                ]);
+            }
 
-            $_SESSION['flash_msg'] = __('تم إنشاء مركز التكلفة بنجاح.', 'Cost center created successfully.');
+            $_SESSION['flash_msg'] = "تم إنشاء مركز التكلفة بنجاح.";
         } catch (Throwable $e) {
             $_SESSION['flash_err'] = $e->getMessage();
             return new RedirectResponse('/ERP/accounting/cost-centers/create');
@@ -164,58 +245,88 @@ class CostCenterController extends Controller
 
     public function edit(Request $request, Response $response, $id = null): Response
     {
-        if (class_exists('\Core\Security\Auth')) Auth::enforce('accounting_cost_centers_edit');
+        if (class_exists('\Core\Security\Auth') && method_exists('\Core\Security\Auth', 'enforce')) {
+            Auth::enforce('accounting_cost_centers_edit');
+        }
 
         $id = $this->resolveId($id);
-        if (session_status() === PHP_SESSION_NONE) session_start();
+        $tenantCond = $this->getTenantCondition('c', 'cost_centers');
+        $hasBranch = $this->hasBranchesSupport();
+        
+        $center = null; $parentCenters = []; $branches = [];
 
         try {
-            $companyId = current_company() ?? 1;
-            $stmt = $this->db->prepare("SELECT * FROM cost_centers WHERE id = ? AND company_id = ?");
-            $stmt->execute([$id, $companyId]);
-            $center = $stmt->fetch(PDO::FETCH_OBJ);
-            
-            if (!$center) throw new Exception(__('مركز التكلفة غير موجود.', 'Cost center not found.'));
+            if (!$id || !$this->db) throw new Exception("معرف المركز غير صالح.");
 
-            $parentCenters = $this->db->query("SELECT id, code, name_ar FROM cost_centers WHERE is_parent = 1 AND id != {$id} AND company_id = {$companyId} ORDER BY code ASC")->fetchAll(PDO::FETCH_OBJ);
+            $companyId = (int)($_SESSION['company_id'] ?? 1);
+            if ($hasBranch) {
+                $branches = $this->db->query("SELECT id, name_ar, name_en FROM branches WHERE company_id = $companyId AND is_active = 1")->fetchAll(PDO::FETCH_OBJ) ?: [];
+            }
+
+            $stmt = $this->db->prepare("SELECT * FROM cost_centers WHERE id = ?");
+            $stmt->execute([$id]);
+            $center = $stmt->fetch(PDO::FETCH_OBJ);
+            if (!$center) throw new Exception("مركز التكلفة غير موجود.");
+
+            $parentCenters = $this->db->query("
+                SELECT id, code, name_ar, name_en 
+                FROM cost_centers c 
+                WHERE is_parent = 1 AND id != {$id} AND $tenantCond 
+                ORDER BY code ASC
+            ")->fetchAll(PDO::FETCH_OBJ) ?: [];
 
         } catch (Throwable $e) {
+            if (session_status() === PHP_SESSION_NONE) session_start();
             $_SESSION['flash_err'] = $e->getMessage();
             return new RedirectResponse('/ERP/accounting/cost-centers');
         }
 
-        ob_start(); include $this->basePath . '/resources/views/accounting/cost_centers/create.php';
-        $content = ob_get_clean();
-        ob_start(); include $this->basePath . '/resources/views/layouts/app.php';
-        return $response->setContent(ob_get_clean())->setHeader('Content-Type', 'text/html');
+        return $this->renderView('/resources/views/accounting/cost_centers/create.php', compact('center', 'parentCenters', 'branches'), $response);
     }
 
     public function update(Request $request, Response $response, $id = null): Response
     {
-        if (class_exists('\Core\Security\Auth')) Auth::enforce('accounting_cost_centers_edit');
+        if (class_exists('\Core\Security\Auth') && method_exists('\Core\Security\Auth', 'enforce')) {
+            Auth::enforce('accounting_cost_centers_edit');
+        }
 
         $id = $this->resolveId($id);
         $data = $_POST;
         if (session_status() === PHP_SESSION_NONE) session_start();
+        
+        $companyId = (int)($_SESSION['company_id'] ?? 1);
+        $sessionBranch = (int)($_SESSION['branch_id'] ?? 0);
+        $branchId = ($sessionBranch > 0) ? $sessionBranch : (!empty($data['branch_id']) ? (int)$data['branch_id'] : 0);
 
         try {
             $parentId = !empty($data['parent_id']) ? (int)$data['parent_id'] : null;
             $budget = !empty($data['budget_amount']) ? (float)$data['budget_amount'] : 0.00;
             $isParent = isset($data['is_parent']) ? 1 : 0;
             $isActive = isset($data['is_active']) ? 1 : 0;
-            $companyId = current_company() ?? 1;
 
-            $stmt = $this->db->prepare("
-                UPDATE cost_centers 
-                SET code = ?, name_ar = ?, name_en = ?, budget_amount = ?, parent_id = ?, is_parent = ?, is_active = ?
-                WHERE id = ? AND company_id = ?
-            ");
-            $stmt->execute([
-                trim($data['code']), trim($data['name_ar']), trim($data['name_en'] ?? ''), $budget,
-                $parentId, $isParent, $isActive, $id, $companyId
-            ]);
+            try {
+                $stmt = $this->db->prepare("
+                    UPDATE cost_centers 
+                    SET branch_id = ?, code = ?, name_ar = ?, name_en = ?, budget_amount = ?, parent_id = ?, is_parent = ?, is_active = ?
+                    WHERE id = ? AND company_id = ?
+                ");
+                $stmt->execute([
+                    $branchId, trim($data['code']), trim($data['name_ar']), trim($data['name_en'] ?? ''), $budget,
+                    $parentId, $isParent, $isActive, $id, $companyId
+                ]);
+            } catch (\PDOException $ex) {
+                $stmt = $this->db->prepare("
+                    UPDATE cost_centers 
+                    SET code = ?, name_ar = ?, name_en = ?, budget_amount = ?, parent_id = ?, is_parent = ?, is_active = ?
+                    WHERE id = ? AND company_id = ?
+                ");
+                $stmt->execute([
+                    trim($data['code']), trim($data['name_ar']), trim($data['name_en'] ?? ''), $budget,
+                    $parentId, $isParent, $isActive, $id, $companyId
+                ]);
+            }
 
-            $_SESSION['flash_msg'] = __('تم تحديث بيانات مركز التكلفة بنجاح.', 'Cost center updated successfully.');
+            $_SESSION['flash_msg'] = "تم تحديث بيانات مركز التكلفة بنجاح.";
         } catch (Throwable $e) {
             $_SESSION['flash_err'] = $e->getMessage();
             return new RedirectResponse("/ERP/accounting/cost-centers/{$id}/edit");
@@ -225,28 +336,29 @@ class CostCenterController extends Controller
 
     public function delete(Request $request, Response $response, $id = null): Response
     {
-        if (class_exists('\Core\Security\Auth')) Auth::enforce('accounting_cost_centers_delete');
+        if (class_exists('\Core\Security\Auth') && method_exists('\Core\Security\Auth', 'enforce')) {
+            Auth::enforce('accounting_cost_centers_delete');
+        }
 
         $id = $this->resolveId($id);
         if (session_status() === PHP_SESSION_NONE) session_start();
+        $companyId = (int)($_SESSION['company_id'] ?? 1);
 
         try {
-            $companyId = current_company() ?? 1;
             $childCheck = $this->db->prepare("SELECT COUNT(*) FROM cost_centers WHERE parent_id = ? AND company_id = ?");
             $childCheck->execute([$id, $companyId]);
             if ($childCheck->fetchColumn() > 0) {
-                throw new Exception(__('لا يمكن حذف مركز تكلفة رئيسي تتبع له مراكز فرعية.', 'Cannot delete parent center with sub-centers.'));
+                throw new Exception("لا يمكن حذف مركز تكلفة رئيسي تتبع له مراكز فرعية.");
             }
 
-            // التأكد من عدم وجود قيود يومية
             $entriesCheck = $this->db->prepare("SELECT COUNT(*) FROM journal_entry_items WHERE cost_center_id = ?");
             $entriesCheck->execute([$id]);
             if ($entriesCheck->fetchColumn() > 0) {
-                throw new Exception(__('لا يمكن حذف المركز لوجود قيود مالية وحركات مسجلة عليه.', 'Cannot delete cost center that has journal entries.'));
+                throw new Exception("لا يمكن حذف المركز لوجود قيود مالية وحركات مسجلة عليه.");
             }
 
             $this->db->prepare("DELETE FROM cost_centers WHERE id = ? AND company_id = ?")->execute([$id, $companyId]);
-            $_SESSION['flash_msg'] = __('تم حذف مركز التكلفة بنجاح.', 'Cost center deleted successfully.');
+            $_SESSION['flash_msg'] = "تم حذف مركز التكلفة بنجاح.";
         } catch (Throwable $e) {
             $_SESSION['flash_err'] = $e->getMessage();
         }
@@ -255,48 +367,62 @@ class CostCenterController extends Controller
 
     public function show(Request $request, Response $response, $id = null): Response
     {
-        if (class_exists('\Core\Security\Auth')) Auth::enforce('accounting_cost_centers_view');
+        if (class_exists('\Core\Security\Auth') && method_exists('\Core\Security\Auth', 'enforce')) {
+            Auth::enforce('accounting_cost_centers_view');
+        }
 
         $id = $this->resolveId($id);
+        $companyId = (int)($_SESSION['company_id'] ?? 1);
+        $hasBranch = $this->hasBranchesSupport();
+        
+        $convert = function($amt) { return function_exists('convert_amount') ? convert_amount((float)$amt) : (float)$amt; };
 
-        $stmt = $this->db->prepare("
-            SELECT c.*, p.name_ar as parent_name, p.code as parent_code
-            FROM cost_centers c
-            LEFT JOIN cost_centers p ON c.parent_id = p.id
-            WHERE c.id = ? AND c.company_id = ?
-        ");
-        $stmt->execute([$id, current_company() ?? 1]);
-        $center = $stmt->fetch(PDO::FETCH_OBJ);
+        try {
+            $branchSelect = $hasBranch ? ", b.name_ar as branch_name, b.name_en as branch_name_en" : "";
+            $branchJoin   = $hasBranch ? "LEFT JOIN branches b ON c.branch_id = b.id" : "";
 
-        if (!$center) {
+            $stmt = $this->db->prepare("
+                SELECT c.*, p.name_ar as parent_name, p.code as parent_code $branchSelect
+                FROM cost_centers c
+                LEFT JOIN cost_centers p ON c.parent_id = p.id
+                $branchJoin
+                WHERE c.id = ? AND c.company_id = ?
+            ");
+            $stmt->execute([$id, $companyId]);
+            $center = $stmt->fetch(PDO::FETCH_OBJ);
+
+            if (!$center) throw new Exception("مركز التكلفة غير موجود.");
+
+            $center->budget_amount = $convert($center->budget_amount);
+
+            $subCenters = $this->db->query("SELECT * FROM cost_centers WHERE parent_id = {$id} ORDER BY code ASC")->fetchAll(PDO::FETCH_OBJ) ?: [];
+
+        } catch (Throwable $e) {
             if (session_status() === PHP_SESSION_NONE) session_start();
-            $_SESSION['flash_err'] = __('مركز التكلفة غير موجود.', 'Cost center not found.');
+            $_SESSION['flash_err'] = $e->getMessage();
             return new RedirectResponse('/ERP/accounting/cost-centers');
         }
 
-        $subCenters = $this->db->query("SELECT * FROM cost_centers WHERE parent_id = {$id} ORDER BY code ASC")->fetchAll(PDO::FETCH_OBJ);
-
-        ob_start(); include $this->basePath . '/resources/views/accounting/cost_centers/show.php';
-        $content = ob_get_clean();
-        ob_start(); include $this->basePath . '/resources/views/layouts/app.php';
-        return $response->setContent(ob_get_clean())->setHeader('Content-Type', 'text/html');
+        return $this->renderView('/resources/views/accounting/cost_centers/show.php', compact('center', 'subCenters'), $response);
     }
 
     public function report(Request $request, Response $response, $id = null): Response
     {
-        if (class_exists('\Core\Security\Auth')) Auth::enforce('accounting_cost_centers_report');
+        if (class_exists('\Core\Security\Auth') && method_exists('\Core\Security\Auth', 'enforce')) {
+            Auth::enforce('accounting_cost_centers_report');
+        }
 
         $id = $this->resolveId($id);
-        $companyId = current_company() ?? 1;
+        $companyId = (int)($_SESSION['company_id'] ?? 1);
+        $convert = function($amt) { return function_exists('convert_amount') ? convert_amount((float)$amt) : (float)$amt; };
 
         try {
             $stmt = $this->db->prepare("SELECT * FROM cost_centers WHERE id = ? AND company_id = ?");
             $stmt->execute([$id, $companyId]);
             $center = $stmt->fetch(PDO::FETCH_OBJ);
 
-            if (!$center) throw new Exception(__('مركز التكلفة غير موجود.', 'Cost center not found.'));
+            if (!$center) throw new Exception("مركز التكلفة غير موجود.");
 
-            // Profit & Loss specific to Cost Center
             $pnlStmt = $this->db->prepare("
                 SELECT 
                     a.type,
@@ -311,8 +437,7 @@ class CostCenterController extends Controller
             $pnlStmt->execute([$id, $companyId]);
             $pnlData = $pnlStmt->fetchAll(PDO::FETCH_OBJ);
 
-            $totalRevenues = 0;
-            $totalExpenses = 0;
+            $totalRevenues = 0; $totalExpenses = 0;
 
             foreach ($pnlData as $row) {
                 if ($row->type === 'revenue') {
@@ -326,21 +451,21 @@ class CostCenterController extends Controller
 
             $accStmt = $this->db->prepare("
                 SELECT 
-                    a.code, a.name_ar, a.type,
+                    a.code, a.name_ar, a.name_en, a.type,
                     SUM(ji.debit) as total_debit,
                     SUM(ji.credit) as total_credit
                 FROM journal_entry_items ji
                 JOIN journal_entries je ON ji.journal_entry_id = je.id
                 JOIN accounts a ON ji.account_id = a.id
                 WHERE ji.cost_center_id = ? AND je.status = 'posted' AND je.company_id = ?
-                GROUP BY a.id, a.code, a.name_ar, a.type
+                GROUP BY a.id, a.code, a.name_ar, a.name_en, a.type
                 ORDER BY a.code ASC
             ");
             $accStmt->execute([$id, $companyId]);
             $accountBreakdown = $accStmt->fetchAll(PDO::FETCH_OBJ) ?: [];
 
             $txStmt = $this->db->prepare("
-                SELECT ji.*, je.entry_number, je.entry_date, je.description as entry_desc, a.name_ar as account_name
+                SELECT ji.*, je.entry_number, je.entry_date, je.description as entry_desc, a.name_ar as account_name, a.name_en as account_name_en
                 FROM journal_entry_items ji
                 JOIN journal_entries je ON ji.journal_entry_id = je.id
                 JOIN accounts a ON ji.account_id = a.id
@@ -350,16 +475,39 @@ class CostCenterController extends Controller
             $txStmt->execute([$id, $companyId]);
             $transactions = $txStmt->fetchAll(PDO::FETCH_OBJ) ?: [];
 
+            // Apply conversions
+            $totalRevenues = $convert($totalRevenues);
+            $totalExpenses = $convert($totalExpenses);
+            $netProfit = $convert($netProfit);
+            $center->budget_amount = $convert($center->budget_amount);
+
         } catch (Throwable $e) {
             if (session_status() === PHP_SESSION_NONE) session_start();
             $_SESSION['flash_err'] = $e->getMessage();
             return new RedirectResponse('/ERP/accounting/cost-centers');
         }
 
-        ob_start();
-        include $this->basePath . '/resources/views/accounting/cost_centers/report.php';
-        $content = ob_get_clean();
-        ob_start(); include $this->basePath . '/resources/views/layouts/app.php';
-        return $response->setContent(ob_get_clean())->setHeader('Content-Type', 'text/html');
+        return $this->renderView('/resources/views/accounting/cost_centers/report.php', compact(
+            'center', 'totalRevenues', 'totalExpenses', 'netProfit', 'accountBreakdown', 'transactions'
+        ), $response);
+    }
+
+    private function renderView(string $viewPath, array $data, Response $response): Response
+    {
+        extract($data);
+        $fullPath = $this->basePath . $viewPath;
+
+        if (!file_exists($fullPath)) {
+            die("<div style='padding:30px; background:#fef2f2; color:#dc2626; font-family:monospace;'><h3>View File Missing:</h3>" . htmlspecialchars($fullPath) . "</div>");
+        }
+
+        try {
+            ob_start(); include $fullPath; $content = ob_get_clean();
+            ob_start(); include $this->basePath . '/resources/views/layouts/app.php'; $finalHtml = ob_get_clean();
+            return $response->setContent($finalHtml)->setHeader('Content-Type', 'text/html; charset=UTF-8');
+        } catch (Throwable $e) {
+            ob_end_clean();
+            die("<div style='padding:30px; background:#fef2f2; color:#dc2626; font-family:monospace;'><h3>Render Error:</h3>" . htmlspecialchars($e->getMessage()) . "</div>");
+        }
     }
 }
