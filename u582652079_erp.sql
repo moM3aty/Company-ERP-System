@@ -3,8 +3,8 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1:3306
--- Generation Time: Sep 08, 2026 at 01:36 AM
--- Server version: 11.8.8-MariaDB-log
+-- Generation Time: Sep 21, 2026 at 11:09 AM
+-- Server version: 11.8.9-MariaDB-log
 -- PHP Version: 7.2.34
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
@@ -56,7 +56,12 @@ INSERT INTO `accounts` (`id`, `company_id`, `branch_id`, `code`, `name_en`, `nam
 (4, 1, 2, '2110', 'Accounts Payable', 'الدائنون (الموردين)', 'liability', 1, NULL, 1, 0, -600.00, 1, '2026-08-22 12:53:33', 0.00),
 (6, 1, 3, '6100', 'Payroll Expense', 'مصروفات الرواتب', 'expense', 0, NULL, 1, 0, 0.00, 1, '2026-08-22 12:53:33', 0.00),
 (7, 1, 3, '9517', '', 'محمد ابوالمعاطي', 'asset', 0, NULL, 1, 1, 20000.00, 1, '2026-08-23 19:41:10', 20000.00),
-(8, 1, 1, '111002', 'Mohamed Abo-Elmaaty', 'محمد ابوالمعاطي', 'asset', 0, NULL, 1, 0, 8000.00, 1, '2026-08-25 03:12:48', 0.00);
+(8, 1, 1, '111002', 'Mohamed Abo-Elmaaty', 'محمد ابوالمعاطي', 'asset', 0, NULL, 1, 0, 8000.00, 1, '2026-08-25 03:12:48', 0.00),
+(10, 1, 2, '111102', 'Jeddah Branch Safe', 'خزينة فرع جدة', 'asset', 0, NULL, 1, 0, 125000.00, 1, '2026-09-21 09:12:53', 0.00),
+(11, 1, 2, '111202', 'NCB Bank - Jeddah', 'البنك الأهلي - فرع جدة', 'asset', 0, NULL, 1, 0, 380000.00, 1, '2026-09-21 09:12:53', 0.00),
+(12, 1, 3, '111103', 'Muscat Branch Safe', 'خزينة فرع مسقط', 'asset', 0, NULL, 1, 0, 45000.00, 1, '2026-09-21 09:12:53', 0.00),
+(13, 1, 3, '111203', 'Bank Muscat Account', 'بنك مسقط الرئيسي', 'asset', 0, NULL, 1, 0, 210000.00, 1, '2026-09-21 09:12:53', 0.00),
+(14, 1, 4, '111104', 'Dubai Branch Safe', 'خزينة فرع دبي', 'asset', 0, NULL, 1, 0, 95000.00, 1, '2026-09-21 09:12:53', 0.00);
 
 -- --------------------------------------------------------
 
@@ -303,7 +308,9 @@ INSERT INTO `crm_leads` (`id`, `company_id`, `branch_id`, `company_name`, `conta
 (7, 1, 1, 'Nour Trust', 'Mohamed Abo-Elmaaty', 'moie.m3aty@gmail.com', '01273844735', 'Referral', 'converted', 10, '2026-08-23', 1, '2026-08-22 15:26:32'),
 (8, 1, 1, 'Nour Trust', 'Mohamed Abo-Elmaaty', 'mome.m3aty@gmail.com', '01897444735', 'Referral', 'contacted', 50, '2026-08-23', 1, '2026-08-22 18:50:10'),
 (9, 1, 1, 'Ahmed Salim ', 'Ahmed Salim', 'workahmed372@gmail.com', '+966501234567', 'Website', 'new', 10, '2026-08-29', 1, '2026-08-22 23:58:35'),
-(10, 1, 1, 'Huda Ali Khamis ', 'Huda Ali ', 'huda@gmail.com', '057823890890787', 'Social Media', 'new', 10, '2026-08-31', 1, '2026-08-22 23:59:55');
+(10, 1, 1, 'Huda Ali Khamis ', 'Huda Ali ', 'huda@gmail.com', '057823890890787', 'Social Media', 'new', 10, '2026-08-31', 1, '2026-08-22 23:59:55'),
+(11, 1, 1, 'شركة الحلول المتقدمة', 'مهندس طارق السعيد', 'tareq@solutions.com', '0501122334', 'Website', 'new', 20, '2026-09-28', 1, '2026-09-21 11:09:41'),
+(12, 1, 2, 'مؤسسة الرياض للتجارة', 'أستاذ فهد العتيبي', 'fahad@riyadh-trade.com', '0554433221', 'Referral', 'contacted', 60, '2026-09-25', 1, '2026-09-21 11:09:41');
 
 -- --------------------------------------------------------
 
@@ -583,6 +590,8 @@ INSERT INTO `goods_receipt_items` (`id`, `receipt_id`, `product_id`, `descriptio
 
 CREATE TABLE `hr_appraisals` (
   `id` bigint(20) UNSIGNED NOT NULL,
+  `company_id` bigint(20) UNSIGNED DEFAULT 1,
+  `branch_id` int(11) DEFAULT 0,
   `appraisal_code` varchar(50) NOT NULL,
   `employee_id` bigint(20) UNSIGNED NOT NULL,
   `evaluator_name` varchar(255) DEFAULT NULL,
@@ -601,8 +610,8 @@ CREATE TABLE `hr_appraisals` (
 -- Dumping data for table `hr_appraisals`
 --
 
-INSERT INTO `hr_appraisals` (`id`, `appraisal_code`, `employee_id`, `evaluator_name`, `appraisal_period`, `appraisal_date`, `score`, `rating_grade`, `status`, `remarks`, `created_by`, `created_at`, `updated_at`) VALUES
-(1, 'APR-2026-001', 1, 'المُقَيِّم المسؤول', 'Annual 2026', '2026-08-27', 100.00, 'Excellent', 'submitted', 'التوصيات وملاحظات الإدارة', 1, '2026-08-27 04:53:31', '2026-08-27 04:53:31');
+INSERT INTO `hr_appraisals` (`id`, `company_id`, `branch_id`, `appraisal_code`, `employee_id`, `evaluator_name`, `appraisal_period`, `appraisal_date`, `score`, `rating_grade`, `status`, `remarks`, `created_by`, `created_at`, `updated_at`) VALUES
+(1, 1, 1, 'APR-2026-001', 1, 'المُقَيِّم المسؤول', 'Annual 2026', '2026-08-27', 100.00, 'Excellent', 'submitted', 'التوصيات وملاحظات الإدارة', 1, '2026-08-27 04:53:31', '2026-09-21 10:56:30');
 
 -- --------------------------------------------------------
 
@@ -712,7 +721,9 @@ CREATE TABLE `hr_documents` (
 --
 
 INSERT INTO `hr_documents` (`id`, `document_code`, `employee_id`, `document_type`, `title_ar`, `file_path`, `issue_date`, `expiry_date`, `status`, `notes`, `created_by`, `created_at`, `updated_at`) VALUES
-(2, 'DOC-2026-0001', 1, 'passport', 'عنوان / مسمى الوثيقة *', '/uploads/hr_documents/EMP-0001/1787818568_6a8ff2483db9d.pdf', '2026-08-27', '2026-08-31', 'active', 'ملاحظات وشروط إضافية', 1, '2026-08-27 05:11:42', '2026-08-27 08:16:08');
+(2, 'DOC-2026-0001', 1, 'passport', 'عنوان / مسمى الوثيقة *', '/uploads/hr_documents/EMP-0001/1787818568_6a8ff2483db9d.pdf', '2026-08-27', '2026-08-31', 'active', 'ملاحظات وشروط إضافية', 1, '2026-08-27 05:11:42', '2026-08-27 08:16:08'),
+(3, 'DOC-EXP-001', 1, 'passport', 'جواز سفر - محمد ابوالمعاطي', NULL, '2021-10-01', '2026-10-03', 'active', 'يتطلب تجديد عاجل', 1, '2026-09-21 11:09:41', '2026-09-21 11:09:41'),
+(4, 'DOC-EXP-002', 1, 'visa', 'إقامة عمل - محمد ابوالمعاطي', NULL, '2023-01-01', '2026-10-16', 'active', 'تجديد تصريح العمل', 1, '2026-09-21 11:09:41', '2026-09-21 11:09:41');
 
 -- --------------------------------------------------------
 
@@ -787,6 +798,8 @@ INSERT INTO `hr_employee_contracts` (`id`, `contract_code`, `employee_id`, `star
 
 CREATE TABLE `hr_leaves` (
   `id` bigint(20) UNSIGNED NOT NULL,
+  `company_id` bigint(20) UNSIGNED DEFAULT 1,
+  `branch_id` int(11) DEFAULT 0,
   `employee_id` bigint(20) UNSIGNED NOT NULL,
   `leave_type` enum('annual','sick','unpaid','maternity','other') NOT NULL DEFAULT 'annual',
   `start_date` date NOT NULL,
@@ -804,8 +817,10 @@ CREATE TABLE `hr_leaves` (
 -- Dumping data for table `hr_leaves`
 --
 
-INSERT INTO `hr_leaves` (`id`, `employee_id`, `leave_type`, `start_date`, `end_date`, `days_count`, `reason`, `status`, `approved_by`, `created_by`, `created_at`, `updated_at`) VALUES
-(1, 1, 'annual', '2026-08-27', '2026-08-28', 2.00, 'سبب الإجازة والتفاصيل', 'pending', NULL, 1, '2026-08-27 04:32:17', '2026-08-27 04:32:17');
+INSERT INTO `hr_leaves` (`id`, `company_id`, `branch_id`, `employee_id`, `leave_type`, `start_date`, `end_date`, `days_count`, `reason`, `status`, `approved_by`, `created_by`, `created_at`, `updated_at`) VALUES
+(1, 1, 1, 1, 'annual', '2026-08-27', '2026-08-28', 2.00, 'سبب الإجازة والتفاصيل', 'pending', NULL, 1, '2026-08-27 04:32:17', '2026-09-21 10:56:30'),
+(2, 1, 1, 1, 'annual', '2026-10-01', '2026-10-05', 5.00, 'إجازة سنوية خطة الخريف', 'pending', NULL, 1, '2026-09-21 11:09:41', '2026-09-21 11:09:41'),
+(3, 1, 2, 1, 'sick', '2026-09-22', '2026-09-24', 2.00, 'إجازة مرضية طارئة', 'pending', NULL, 1, '2026-09-21 11:09:41', '2026-09-21 11:09:41');
 
 -- --------------------------------------------------------
 
@@ -1046,9 +1061,9 @@ CREATE TABLE `inv_products` (
 --
 
 INSERT INTO `inv_products` (`id`, `company_id`, `branch_id`, `sku`, `barcode`, `name_en`, `name_ar`, `category_id`, `type`, `unit`, `cost_price`, `sale_price`, `tax_percent`, `track_batches`, `track_serials`, `reorder_level`, `is_active`, `created_at`) VALUES
-(1, 1, 1, 'PRD-LPT-001', '1234567890123', 'Dell XPS 15 Laptop', 'لابتوب ديل XPS 15', 1, 'storable', 'pcs', 4500.0000, 5800.0000, 15.00, 0, 0, 0.00, 1, '2026-08-22 13:39:34'),
-(2, 1, 2, 'PRD-LPT-002', '1234567890124', 'MacBook Pro 16', 'ماك بوك برو 16 إنش', 1, 'storable', 'pcs', 8500.0000, 10500.0000, 15.00, 0, 0, 0.00, 1, '2026-08-22 13:39:34'),
-(3, 1, 3, 'PRD-FUR-001', '1234567890125', 'Ergonomic Office Chair', 'كرسي مكتب طبي مريح', 2, 'storable', 'pcs', 350.0000, 550.0000, 15.00, 0, 0, 0.00, 1, '2026-08-22 13:39:34'),
+(1, 1, 1, 'PRD-LPT-001', '1234567890123', 'Dell XPS 15 Laptop', 'لابتوب ديل XPS 15', 1, 'storable', 'pcs', 4500.0000, 5800.0000, 15.00, 0, 0, 15.00, 1, '2026-08-22 13:39:34'),
+(2, 1, 2, 'PRD-LPT-002', '1234567890124', 'MacBook Pro 16', 'ماك بوك برو 16 إنش', 1, 'storable', 'pcs', 8500.0000, 10500.0000, 15.00, 0, 0, 15.00, 1, '2026-08-22 13:39:34'),
+(3, 1, 3, 'PRD-FUR-001', '1234567890125', 'Ergonomic Office Chair', 'كرسي مكتب طبي مريح', 2, 'storable', 'pcs', 350.0000, 550.0000, 15.00, 0, 0, 15.00, 1, '2026-08-22 13:39:34'),
 (4, 1, 4, 'PRD-FUR-002', '1234567890126', 'Executive Desk', 'مكتب إداري فاخر', 2, 'storable', 'pcs', 800.0000, 1200.0000, 15.00, 0, 0, 0.00, 1, '2026-08-22 13:39:34'),
 (5, 1, 1, 'PRD-SRV-001', NULL, 'Annual Maintenance Contract', 'عقد صيانة سنوي للأجهزة', 3, 'service', 'contract', 0.0000, 2500.0000, 15.00, 0, 0, 0.00, 1, '2026-08-22 13:39:34'),
 (6, 1, 2, 'PRD-SRV-002', NULL, 'Software Installation Support', 'خدمة تثبيت ودعم البرمجيات', 3, 'service', 'hour', 0.0000, 150.0000, 15.00, 0, 0, 0.00, 1, '2026-08-22 13:39:34');
@@ -1316,9 +1331,9 @@ CREATE TABLE `products` (
 --
 
 INSERT INTO `products` (`id`, `category_id`, `company_id`, `branch_id`, `item_code`, `barcode`, `name_ar`, `name_en`, `description`, `purchase_price`, `created_at`, `unit`, `selling_price`, `reorder_level`, `is_active`) VALUES
-(1, 1, 1, 1, 'ITM-1001', '', 'لابتوب ديل انسبايرون (Core i7)', 'Dell Inspiron Laptop', '', 25000.00, '2026-08-22 19:59:53', 'قطعة', 0.00, 0.00, 1),
-(2, NULL, 1, 2, 'ITM-1002', NULL, 'ورق طباعة A4 ممتاز 80 جرام', 'A4 Printer Paper 80g', NULL, 180.00, '2026-08-22 19:59:53', 'قطعة', 0.00, 0.00, 1),
-(3, NULL, 1, 3, 'ITM-1003', NULL, 'حبر طابعة أسود HP', 'HP Black Ink Cartridge', NULL, 500.00, '2026-08-22 19:59:53', 'قطعة', 0.00, 0.00, 1),
+(1, 1, 1, 1, 'ITM-1001', '', 'لابتوب ديل انسبايرون (Core i7)', 'Dell Inspiron Laptop', '', 25000.00, '2026-08-22 19:59:53', 'قطعة', 0.00, 20.00, 1),
+(2, NULL, 1, 2, 'ITM-1002', NULL, 'ورق طباعة A4 ممتاز 80 جرام', 'A4 Printer Paper 80g', NULL, 180.00, '2026-08-22 19:59:53', 'قطعة', 0.00, 20.00, 1),
+(3, NULL, 1, 3, 'ITM-1003', NULL, 'حبر طابعة أسود HP', 'HP Black Ink Cartridge', NULL, 500.00, '2026-08-22 19:59:53', 'قطعة', 0.00, 20.00, 1),
 (5, NULL, 1, 4, 'ITM-1005', '', 'مكتب خشبي إداري حديث', 'Modern Office Desk', 'وصف وتفاصيل الصنف\r\n', 3500.00, '2026-08-22 19:59:53', 'قطعة', 4000.00, 5.00, 1),
 (6, 1, 1, 1, 'oo112', 'weffaf', 'برنامج سحابي للمحاماه ', 'ERP for  office ', 'wegavasv', 300.00, '2026-08-22 22:54:48', 'قطعة', 2500.00, 0.97, 1),
 (7, 1, 1, 0, 'ITM-26110', 'الباركود الدولي (Barcode)', 'Product Name (Arabic) *', 'Product Name (English)', 'Product Description\r\n', 80.00, '2026-09-07 23:12:50', 'قطعة', 50.00, 70.00, 0);
@@ -1617,6 +1632,7 @@ INSERT INTO `purchase_invoice_items` (`id`, `invoice_id`, `product_id`, `descrip
 CREATE TABLE `purchase_orders` (
   `id` bigint(20) UNSIGNED NOT NULL,
   `company_id` bigint(20) UNSIGNED DEFAULT 1,
+  `branch_id` int(11) DEFAULT 0,
   `supplier_id` bigint(20) UNSIGNED NOT NULL,
   `po_number` varchar(50) NOT NULL,
   `order_number` varchar(50) NOT NULL,
@@ -1637,8 +1653,8 @@ CREATE TABLE `purchase_orders` (
 -- Dumping data for table `purchase_orders`
 --
 
-INSERT INTO `purchase_orders` (`id`, `company_id`, `supplier_id`, `po_number`, `order_number`, `order_date`, `delivery_date`, `expected_delivery_date`, `subtotal`, `tax_amount`, `total_amount`, `status`, `notes`, `created_at`, `updated_at`, `discount_amount`) VALUES
-(1, 1, 1, 'PO-260822-940', '', '2026-08-22', '2026-08-24', NULL, 8000.00, 40.00, 8025.00, 'sent', 'ملاحظات للمورد وشروط الدفع\r\n', '2026-08-22 21:08:51', '2026-08-22 21:10:11', 15.00);
+INSERT INTO `purchase_orders` (`id`, `company_id`, `branch_id`, `supplier_id`, `po_number`, `order_number`, `order_date`, `delivery_date`, `expected_delivery_date`, `subtotal`, `tax_amount`, `total_amount`, `status`, `notes`, `created_at`, `updated_at`, `discount_amount`) VALUES
+(1, 1, 1, 1, 'PO-260822-940', '', '2026-08-22', '2026-08-24', NULL, 8000.00, 40.00, 8025.00, 'sent', 'ملاحظات للمورد وشروط الدفع\r\n', '2026-08-22 21:08:51', '2026-09-21 10:56:30', 15.00);
 
 -- --------------------------------------------------------
 
@@ -1672,6 +1688,7 @@ INSERT INTO `purchase_order_items` (`id`, `po_id`, `product_id`, `description`, 
 CREATE TABLE `purchase_requests` (
   `id` bigint(20) UNSIGNED NOT NULL,
   `company_id` bigint(20) UNSIGNED DEFAULT 1,
+  `branch_id` int(11) DEFAULT 0,
   `pr_number` varchar(50) NOT NULL,
   `request_date` date NOT NULL,
   `required_date` date NOT NULL,
@@ -1688,8 +1705,8 @@ CREATE TABLE `purchase_requests` (
 -- Dumping data for table `purchase_requests`
 --
 
-INSERT INTO `purchase_requests` (`id`, `company_id`, `pr_number`, `request_date`, `required_date`, `department`, `requested_by`, `status`, `total_estimated_value`, `notes`, `created_at`, `updated_at`) VALUES
-(1, 1, 'PR-260822-54', '2026-08-22', '2026-08-25', 'IT', 'محمد أبوالمعاطي ', 'pending', 1350000.00, '', '2026-08-22 20:05:49', '2026-08-22 20:12:34');
+INSERT INTO `purchase_requests` (`id`, `company_id`, `branch_id`, `pr_number`, `request_date`, `required_date`, `department`, `requested_by`, `status`, `total_estimated_value`, `notes`, `created_at`, `updated_at`) VALUES
+(1, 1, 1, 'PR-260822-54', '2026-08-22', '2026-08-25', 'IT', 'محمد أبوالمعاطي ', 'pending', 1350000.00, '', '2026-08-22 20:05:49', '2026-09-21 10:56:30');
 
 -- --------------------------------------------------------
 
@@ -2193,7 +2210,9 @@ CREATE TABLE `sales_invoices` (
 
 INSERT INTO `sales_invoices` (`id`, `company_id`, `branch_id`, `invoice_number`, `customer_id`, `issue_date`, `due_date`, `subtotal`, `tax_amount`, `total_amount`, `paid_amount`, `status`, `notes`, `created_at`) VALUES
 (1, 1, NULL, 'INV-2026087928', 2, '2026-08-22', '2026-09-06', 21550.00, 3232.50, 24782.50, 24170.00, 'partially_paid', '', '2026-08-22 16:32:49'),
-(2, 1, NULL, 'INV-2026087030', 12, '2026-08-23', '2026-09-07', 6100.00, 915.00, 7015.00, 0.00, 'partially_paid', 'as per the term and condition ', '2026-08-23 00:49:26');
+(2, 1, NULL, 'INV-2026087030', 12, '2026-08-23', '2026-09-07', 6100.00, 915.00, 7015.00, 0.00, 'partially_paid', 'as per the term and condition ', '2026-08-23 00:49:26'),
+(3, 1, 1, 'INV-2026-OVERDU01', 2, '2026-07-01', '2026-08-01', 12000.00, 1800.00, 13800.00, 3800.00, 'partially_paid', 'فاتورة متأخرة السداد', '2026-09-21 11:09:41'),
+(4, 1, 2, 'INV-2026-OVERDU02', 12, '2026-06-15', '2026-07-15', 25000.00, 3750.00, 28750.00, 0.00, 'unpaid', 'مستحقات متأخرة فرع جدة', '2026-09-21 11:09:41');
 
 -- --------------------------------------------------------
 
@@ -3019,6 +3038,8 @@ INSERT INTO `taxes` (`id`, `code`, `name_ar`, `tax_rate`, `name_en`, `type`, `ra
 
 CREATE TABLE `treasury_cheques` (
   `id` bigint(20) UNSIGNED NOT NULL,
+  `company_id` bigint(20) UNSIGNED DEFAULT 1,
+  `branch_id` int(11) DEFAULT 0,
   `cheque_number` varchar(100) NOT NULL,
   `type` enum('received','issued') NOT NULL DEFAULT 'received',
   `bank_name` varchar(255) NOT NULL,
@@ -3038,8 +3059,12 @@ CREATE TABLE `treasury_cheques` (
 -- Dumping data for table `treasury_cheques`
 --
 
-INSERT INTO `treasury_cheques` (`id`, `cheque_number`, `type`, `bank_name`, `treasury_account_id`, `payee_payer_name`, `amount`, `issue_date`, `due_date`, `status`, `notes`, `created_by`, `created_at`, `updated_at`) VALUES
-(1, '46465416', 'received', 'اسم البنك المسحوب عليه *', 8, 'اسم المستفيد / الساحب *', 5000.00, '2026-08-25', '2026-08-25', 'pending', 'ملاحظات وشروط الشيك', 1, '2026-08-25 03:38:23', '2026-08-25 03:38:23');
+INSERT INTO `treasury_cheques` (`id`, `company_id`, `branch_id`, `cheque_number`, `type`, `bank_name`, `treasury_account_id`, `payee_payer_name`, `amount`, `issue_date`, `due_date`, `status`, `notes`, `created_by`, `created_at`, `updated_at`) VALUES
+(1, 1, 0, '46465416', 'received', 'اسم البنك المسحوب عليه *', 8, 'اسم المستفيد / الساحب *', 5000.00, '2026-08-25', '2026-08-25', 'pending', 'ملاحظات وشروط الشيك', 1, '2026-08-25 03:38:23', '2026-08-25 03:38:23'),
+(2, 1, 1, 'CHQ-99012', 'received', 'البنك الأهلي السعودي', 1, 'شركة الأمل للمقاولات', 32000.00, '2026-09-10', '2026-09-25', 'pending', 'شيك برسم التحصيل عن فاتورة 401', 1, '2026-09-21 09:12:53', '2026-09-21 09:12:53'),
+(3, 1, 1, 'CHQ-99013', 'issued', 'بنك مصر', 1, 'شركة السلام للتوريدات', 15000.00, '2026-09-01', '2026-09-18', 'collected', 'شيك صادر تم تحصيله بنجاح', 1, '2026-09-21 09:12:53', '2026-09-21 09:12:53'),
+(4, 1, 2, 'CHQ-JED-01', 'received', 'مصرف الراجحي', 11, 'خالد البراك', 28000.00, '2026-09-12', '2026-09-22', 'pending', 'شيك مسحوب لحساب فرع جدة', 1, '2026-09-21 09:12:53', '2026-09-21 09:12:53'),
+(5, 1, 3, 'CHQ-OMN-01', 'received', 'بنك مسقط', 13, 'مؤسسة مسقط للتجارة', 14500.00, '2026-09-05', '2026-09-15', 'bounced', 'مرتد لعدم كفاية الرصيد', 1, '2026-09-21 09:12:53', '2026-09-21 09:12:53');
 
 -- --------------------------------------------------------
 
@@ -3049,6 +3074,8 @@ INSERT INTO `treasury_cheques` (`id`, `cheque_number`, `type`, `bank_name`, `tre
 
 CREATE TABLE `treasury_payments` (
   `id` bigint(20) UNSIGNED NOT NULL,
+  `company_id` bigint(20) UNSIGNED DEFAULT 1,
+  `branch_id` int(11) DEFAULT 0,
   `voucher_number` varchar(100) NOT NULL,
   `payment_date` date NOT NULL,
   `treasury_account_id` bigint(20) UNSIGNED NOT NULL,
@@ -3067,8 +3094,13 @@ CREATE TABLE `treasury_payments` (
 -- Dumping data for table `treasury_payments`
 --
 
-INSERT INTO `treasury_payments` (`id`, `voucher_number`, `payment_date`, `treasury_account_id`, `supplier_id`, `payee_name`, `amount`, `payment_method`, `reference_no`, `description`, `created_by`, `created_at`, `updated_at`) VALUES
-(1, 'PV-2026-00001', '2026-08-25', 8, 1, 'اسم المستفيد صراحة (اصرفوا إلى)', 8000.00, 'cheque', '6453163164165', 'البيان والوصف التفصيلي', 1, '2026-08-25 03:18:29', '2026-08-25 03:18:29');
+INSERT INTO `treasury_payments` (`id`, `company_id`, `branch_id`, `voucher_number`, `payment_date`, `treasury_account_id`, `supplier_id`, `payee_name`, `amount`, `payment_method`, `reference_no`, `description`, `created_by`, `created_at`, `updated_at`) VALUES
+(1, 1, 0, 'PV-2026-00001', '2026-08-25', 8, 1, 'اسم المستفيد صراحة (اصرفوا إلى)', 8000.00, 'cheque', '6453163164165', 'البيان والوصف التفصيلي', 1, '2026-08-25 03:18:29', '2026-08-25 03:18:29'),
+(2, 1, 1, 'PV-2026-00002', '2026-09-16', 2, 1, 'محمد ابوالمعاطي', 12500.00, 'cash', 'CSH-OUT-10', 'سداد مستحقات توريد قطع غيار', 1, '2026-09-21 09:12:53', '2026-09-21 09:12:53'),
+(3, 1, 1, 'PV-2026-00003', '2026-09-17', 1, 1, 'شركة الخليج للتوريدات', 22000.00, 'bank_transfer', 'TRF-OUT-88', 'تحويل بنكي مقابل فاتورة مشتريات', 1, '2026-09-21 09:12:53', '2026-09-21 09:12:53'),
+(4, 1, 2, 'PV-2026-00004', '2026-09-19', 10, NULL, 'شركة الكهرباء والمرافق', 3400.00, 'cash', 'UTIL-009', 'سداد فاتورة الكهرباء والصيانة', 1, '2026-09-21 09:12:53', '2026-09-21 09:12:53'),
+(5, 1, 2, 'PV-2026-00005', '2026-09-20', 11, 1, 'محمد ابوالمعاطي', 18000.00, 'cheque', 'CHQ-ISS-01', 'شيك صادر للمورد مقابل بضاعة', 1, '2026-09-21 09:12:53', '2026-09-21 09:12:53'),
+(6, 1, 3, 'PV-2026-00006', '2026-09-21', 12, NULL, 'مالك العقار - مسقط', 8500.00, 'cash', 'RENT-2026', 'سداد إيجار مكتب فرع عمان', 1, '2026-09-21 09:12:53', '2026-09-21 09:12:53');
 
 -- --------------------------------------------------------
 
@@ -3078,6 +3110,8 @@ INSERT INTO `treasury_payments` (`id`, `voucher_number`, `payment_date`, `treasu
 
 CREATE TABLE `treasury_petty_cash` (
   `id` bigint(20) UNSIGNED NOT NULL,
+  `company_id` bigint(20) UNSIGNED DEFAULT 1,
+  `branch_id` int(11) DEFAULT 0,
   `code` varchar(100) NOT NULL,
   `employee_name` varchar(255) NOT NULL,
   `treasury_account_id` bigint(20) UNSIGNED NOT NULL,
@@ -3096,8 +3130,10 @@ CREATE TABLE `treasury_petty_cash` (
 -- Dumping data for table `treasury_petty_cash`
 --
 
-INSERT INTO `treasury_petty_cash` (`id`, `code`, `employee_name`, `treasury_account_id`, `amount`, `spent_amount`, `remaining_amount`, `issue_date`, `status`, `description`, `created_by`, `created_at`, `updated_at`) VALUES
-(1, 'PC-2026-00001', 'اسم الموظف المسؤول عن العُهدة *', 8, 8000.00, 2000.00, 6000.00, '2026-08-25', 'partially_settled', 'الغرض والبيان التفصيلي من العُهدة', 1, '2026-08-25 03:26:58', '2026-08-25 03:27:12');
+INSERT INTO `treasury_petty_cash` (`id`, `company_id`, `branch_id`, `code`, `employee_name`, `treasury_account_id`, `amount`, `spent_amount`, `remaining_amount`, `issue_date`, `status`, `description`, `created_by`, `created_at`, `updated_at`) VALUES
+(2, 1, 1, 'PC-2026-00002', 'أحمد خليل - مسؤول الضيافة', 2, 5000.00, 1200.00, 3800.00, '2026-09-01', 'partially_settled', 'عهدة نثريات وضيافة المكاتب الرئيسية', 1, '2026-09-21 09:12:53', '2026-09-21 09:12:53'),
+(3, 1, 2, 'PC-2026-00003', 'سارة السيد - المشتريات', 10, 10000.00, 4500.00, 5500.00, '2026-09-10', 'partially_settled', 'عهدة مستلزمات تشغيلية لفرع جدة', 1, '2026-09-21 09:12:53', '2026-09-21 09:12:53'),
+(4, 1, 3, 'PC-2026-00004', 'مهند الجوهري - المبيعات', 12, 3000.00, 3000.00, 0.00, '2026-09-05', 'closed', 'عهدة مصاريف انتقال وسفريات', 1, '2026-09-21 09:12:53', '2026-09-21 09:12:53');
 
 -- --------------------------------------------------------
 
@@ -3107,6 +3143,8 @@ INSERT INTO `treasury_petty_cash` (`id`, `code`, `employee_name`, `treasury_acco
 
 CREATE TABLE `treasury_receipts` (
   `id` bigint(20) UNSIGNED NOT NULL,
+  `company_id` bigint(20) UNSIGNED DEFAULT 1,
+  `branch_id` int(11) DEFAULT 0,
   `voucher_number` varchar(100) NOT NULL,
   `receipt_date` date NOT NULL,
   `treasury_account_id` bigint(20) UNSIGNED NOT NULL,
@@ -3125,8 +3163,14 @@ CREATE TABLE `treasury_receipts` (
 -- Dumping data for table `treasury_receipts`
 --
 
-INSERT INTO `treasury_receipts` (`id`, `voucher_number`, `receipt_date`, `treasury_account_id`, `customer_id`, `payer_name`, `amount`, `payment_method`, `reference_no`, `description`, `created_by`, `created_at`, `updated_at`) VALUES
-(1, 'RV-2026-00001', '2026-08-25', 1, 2, 'اسم الدافع / المسلم صراحة', 5000.00, 'bank_transfer', '6453163164165', 'البيان والوصف التفصيلي', 1, '2026-08-25 03:07:50', '2026-08-25 03:07:50');
+INSERT INTO `treasury_receipts` (`id`, `company_id`, `branch_id`, `voucher_number`, `receipt_date`, `treasury_account_id`, `customer_id`, `payer_name`, `amount`, `payment_method`, `reference_no`, `description`, `created_by`, `created_at`, `updated_at`) VALUES
+(1, 1, 0, 'RV-2026-00001', '2026-08-25', 1, 2, 'اسم الدافع / المسلم صراحة', 5000.00, 'bank_transfer', '6453163164165', 'البيان والوصف التفصيلي', 1, '2026-08-25 03:07:50', '2026-08-25 03:07:50'),
+(2, 1, 1, 'RV-2026-00002', '2026-09-15', 2, 2, 'محمد ابوالمعاطي', 15000.00, 'cash', 'CSH-9921', 'دفعة من حساب فاتورة مبيعات', 1, '2026-09-21 09:12:53', '2026-09-21 09:12:53'),
+(3, 1, 1, 'RV-2026-00003', '2026-09-18', 1, 8, 'علاء السيد', 28500.00, 'bank_transfer', 'TRF-88129', 'تحويل بنكي سداد مستحقات', 1, '2026-09-21 09:12:53', '2026-09-21 09:12:53'),
+(4, 1, 2, 'RV-2026-00004', '2026-09-19', 10, 12, 'عبدالله أحمد عبدالرحيم', 12000.00, 'cash', 'CSH-5012', 'تحصيل نقدي مبيعات فرع جدة', 1, '2026-09-21 09:12:53', '2026-09-21 09:12:53'),
+(5, 1, 2, 'RV-2026-00005', '2026-09-20', 11, 13, 'خالد سالم علي البراك', 45000.00, 'bank_transfer', 'NCB-44120', 'سداد دفعة العقد السنوي', 1, '2026-09-21 09:12:53', '2026-09-21 09:12:53'),
+(6, 1, 3, 'RV-2026-00006', '2026-09-21', 13, NULL, 'شركة النور الدولية', 18500.00, 'cheque', 'CHQ-77120', 'شيك وارد برسم التحصيل', 1, '2026-09-21 09:12:53', '2026-09-21 09:12:53'),
+(7, 1, 4, 'RV-2026-00007', '2026-09-21', 14, NULL, 'مستثمر خارجي', 35000.00, 'pos', 'POS-9982', 'مقبوضات شبكة مدى / نقطة بيع', 1, '2026-09-21 09:12:53', '2026-09-21 09:12:53');
 
 -- --------------------------------------------------------
 
@@ -3136,6 +3180,8 @@ INSERT INTO `treasury_receipts` (`id`, `voucher_number`, `receipt_date`, `treasu
 
 CREATE TABLE `treasury_transfers` (
   `id` bigint(20) UNSIGNED NOT NULL,
+  `company_id` bigint(20) UNSIGNED DEFAULT 1,
+  `branch_id` int(11) DEFAULT 0,
   `transfer_number` varchar(100) NOT NULL,
   `transfer_date` date NOT NULL,
   `from_account_id` bigint(20) UNSIGNED NOT NULL,
@@ -3152,8 +3198,11 @@ CREATE TABLE `treasury_transfers` (
 -- Dumping data for table `treasury_transfers`
 --
 
-INSERT INTO `treasury_transfers` (`id`, `transfer_number`, `transfer_date`, `from_account_id`, `to_account_id`, `amount`, `reference_no`, `description`, `created_by`, `created_at`, `updated_at`) VALUES
-(1, 'TRF-2026-00001', '2026-08-25', 1, 8, 20000.00, '6453163164165', 'البيان والوصف التفصيلي', 1, '2026-08-25 03:21:48', '2026-08-25 03:21:48');
+INSERT INTO `treasury_transfers` (`id`, `company_id`, `branch_id`, `transfer_number`, `transfer_date`, `from_account_id`, `to_account_id`, `amount`, `reference_no`, `description`, `created_by`, `created_at`, `updated_at`) VALUES
+(1, 1, 0, 'TRF-2026-00001', '2026-08-25', 1, 8, 20000.00, '6453163164165', 'البيان والوصف التفصيلي', 1, '2026-08-25 03:21:48', '2026-08-25 03:21:48'),
+(2, 1, 1, 'TRF-2026-00002', '2026-09-18', 2, 1, 50000.00, 'DEP-8812', 'إيداع نقدي من الخزينة الرئيسية إلى البنك', 1, '2026-09-21 09:12:53', '2026-09-21 09:12:53'),
+(3, 1, 2, 'TRF-2026-00003', '2026-09-20', 10, 11, 25000.00, 'DEP-JED-01', 'تغذية حساب البنك الأهلي من خزينة جدة', 1, '2026-09-21 09:12:53', '2026-09-21 09:12:53'),
+(4, 1, 3, 'TRF-2026-00004', '2026-09-21', 13, 12, 10000.00, 'WTH-OMN-02', 'سحب نقدي من بنك مسقط لتغذية الخزينة', 1, '2026-09-21 09:12:53', '2026-09-21 09:12:53');
 
 -- --------------------------------------------------------
 
@@ -4103,7 +4152,7 @@ ALTER TABLE `warehouses`
 -- AUTO_INCREMENT for table `accounts`
 --
 ALTER TABLE `accounts`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=15;
 
 --
 -- AUTO_INCREMENT for table `asset_depreciations`
@@ -4157,7 +4206,7 @@ ALTER TABLE `cost_centers`
 -- AUTO_INCREMENT for table `crm_leads`
 --
 ALTER TABLE `crm_leads`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=11;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=13;
 
 --
 -- AUTO_INCREMENT for table `customers`
@@ -4241,7 +4290,7 @@ ALTER TABLE `hr_designations`
 -- AUTO_INCREMENT for table `hr_documents`
 --
 ALTER TABLE `hr_documents`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
 
 --
 -- AUTO_INCREMENT for table `hr_employees`
@@ -4259,7 +4308,7 @@ ALTER TABLE `hr_employee_contracts`
 -- AUTO_INCREMENT for table `hr_leaves`
 --
 ALTER TABLE `hr_leaves`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
 
 --
 -- AUTO_INCREMENT for table `hr_payroll`
@@ -4529,7 +4578,7 @@ ALTER TABLE `sales_contracts`
 -- AUTO_INCREMENT for table `sales_invoices`
 --
 ALTER TABLE `sales_invoices`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
 
 --
 -- AUTO_INCREMENT for table `sales_invoice_lines`
@@ -4733,31 +4782,31 @@ ALTER TABLE `taxes`
 -- AUTO_INCREMENT for table `treasury_cheques`
 --
 ALTER TABLE `treasury_cheques`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
 
 --
 -- AUTO_INCREMENT for table `treasury_payments`
 --
 ALTER TABLE `treasury_payments`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
 
 --
 -- AUTO_INCREMENT for table `treasury_petty_cash`
 --
 ALTER TABLE `treasury_petty_cash`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
 
 --
 -- AUTO_INCREMENT for table `treasury_receipts`
 --
 ALTER TABLE `treasury_receipts`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
 
 --
 -- AUTO_INCREMENT for table `treasury_transfers`
 --
 ALTER TABLE `treasury_transfers`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
 
 --
 -- AUTO_INCREMENT for table `users`
