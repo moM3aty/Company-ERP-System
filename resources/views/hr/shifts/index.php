@@ -8,9 +8,64 @@ $flashMsg = $_SESSION['flash_msg'] ?? null;
 $flashErr = $_SESSION['flash_err'] ?? null;
 unset($_SESSION['flash_msg'], $_SESSION['flash_err']);
 
+$activeBranchName = $_SESSION['active_branch_name'] ?? ($isRtl ? 'كل الفروع' : 'All Branches');
+
+$t = [
+    'ar' => [
+        'title' => 'الورديات ومواعيد العمل (Shifts & Schedules)',
+        'desc' => 'إعداد فترات العمل اليومية، أوقات الدخول والخروج وفترات السماح.',
+        'add_btn' => 'إضافة وردية جديدة',
+        'col_code' => 'كود الوردية',
+        'col_name' => 'المسمى / الاسم',
+        'col_in' => 'وقت الدخول',
+        'col_out' => 'وقت الانصراف',
+        'col_grace' => 'فترة السماح',
+        'col_status' => 'الحالة',
+        'col_actions' => 'إجراءات',
+        'empty' => 'لا توجد ورديات عمل مسجلة بمواصفات البحث.',
+        'search_ph' => 'ابحث بكود أو اسم الوردية...',
+        'btn_search' => 'فلترة',
+        'btn_clear' => 'إلغاء',
+        'active_scope' => 'الفرع النشط:',
+        'kpi_total' => 'إجمالي الورديات',
+        'kpi_active' => 'ورديات نشطة',
+        'kpi_inactive' => 'ورديات متوقفة',
+        'all_statuses' => '-- كل الحالات --',
+        'status_active' => 'وردية مفعلة',
+        'status_inactive' => 'متوقفة',
+        'mins_lbl' => 'دقيقة',
+        'confirm_delete' => 'هل أنت متأكد من حذف هذه الوردية؟'
+    ],
+    'en' => [
+        'title' => 'Shifts & Work Schedules',
+        'desc' => 'Manage daily work shifts, check-in/out times, and grace periods.',
+        'add_btn' => 'Add New Shift',
+        'col_code' => 'Shift Code',
+        'col_name' => 'Shift Name',
+        'col_in' => 'Start Time',
+        'col_out' => 'End Time',
+        'col_grace' => 'Grace Period',
+        'col_status' => 'Status',
+        'col_actions' => 'Actions',
+        'empty' => 'No shifts found matching the criteria.',
+        'search_ph' => 'Search by shift code or name...',
+        'btn_search' => 'Filter',
+        'btn_clear' => 'Clear',
+        'active_scope' => 'Active Branch:',
+        'kpi_total' => 'Total Shifts',
+        'kpi_active' => 'Active Shifts',
+        'kpi_inactive' => 'Inactive Shifts',
+        'all_statuses' => '-- All Statuses --',
+        'status_active' => 'Active',
+        'status_inactive' => 'Inactive',
+        'mins_lbl' => 'Mins',
+        'confirm_delete' => 'Are you sure you want to delete this shift?'
+    ]
+][$isRtl ? 'ar' : 'en'];
+
 $statusMap = [
-    'active' => ['label' => 'وردية مفعلة', 'color' => '#16a34a', 'bg' => '#dcfce7', 'icon' => 'ph-check-circle'],
-    'inactive' => ['label' => 'وردية متوقفة', 'color' => '#64748b', 'bg' => '#f1f5f9', 'icon' => 'ph-minus-circle'],
+    'active'   => ['label' => $t['status_active'], 'color' => '#16a34a', 'bg' => '#dcfce7', 'icon' => 'ph-check-circle'],
+    'inactive' => ['label' => $t['status_inactive'], 'color' => '#64748b', 'bg' => '#f1f5f9', 'icon' => 'ph-minus-circle'],
 ];
 ?>
 
@@ -30,6 +85,8 @@ $statusMap = [
     .shift-icon { width: 48px; height: 48px; background: var(--c-shift-light); color: var(--c-shift); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.8rem; box-shadow: 0 4px 10px rgba(22, 163, 74, 0.15); }
     .shift-title { margin: 0; color: var(--c-text-dark); font-size: 1.6rem; font-weight: 900; }
     .btn-shift { background: linear-gradient(135deg, var(--c-shift), var(--c-shift-dark)); color: #ffffff !important; border: none; padding: 10px 24px; border-radius: 10px; font-weight: 800; display: inline-flex; align-items: center; gap: 8px; text-decoration: none; box-shadow: 0 4px 12px rgba(22, 163, 74, 0.25); }
+
+    .branch-scope-badge { display: inline-flex; align-items: center; gap: 8px; background: #f8fafc; border: 1px solid var(--c-border); padding: 6px 14px; border-radius: 20px; font-size: 0.8rem; font-weight: 800; color: var(--c-text-dark); margin-bottom: 24px; }
 
     .kpi-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px; }
     @media(max-width:768px){ .kpi-row { grid-template-columns: 1fr; } }
@@ -56,6 +113,10 @@ $statusMap = [
     .page-link.active { background: var(--c-shift); color: #ffffff; border-color: var(--c-shift); }
 
     .badge-status { padding: 4px 10px; border-radius: 6px; font-weight: 800; font-size: 0.75rem; display: inline-flex; align-items: center; gap: 4px; }
+    .branch-badge { background: #f1f5f9; color: #475569; padding: 2px 8px; border-radius: 4px; font-size: 0.7rem; font-weight: bold; border: 1px solid #cbd5e1; display: inline-block; margin-top: 4px;}
+
+    /* إخفاء DataTables Injection */
+    .dataTables_wrapper .dataTables_filter, .dataTables_wrapper .dataTables_length, .dataTables_wrapper .dataTables_info, .dataTables_wrapper .dataTables_paginate { display: none !important; }
 </style>
 
 <div class="shift-wrapper" dir="<?= $isRtl ? 'rtl' : 'ltr' ?>">
@@ -63,59 +124,75 @@ $statusMap = [
         <div class="shift-title-box">
             <div class="shift-icon"><i class="ph-duotone ph-clock-user"></i></div>
             <div>
-                <h2 class="shift-title">الورديات ومواعيد العمل (Shifts & Schedules)</h2>
-                <p style="margin:4px 0 0 0; color:var(--c-text-muted);">إعداد فترات العمل اليومية، أوقات الدخول والخروج وفترات السماح.</p>
+                <h2 class="shift-title"><?= $t['title'] ?></h2>
+                <p style="margin:4px 0 0 0; color:var(--c-text-muted);"><?= $t['desc'] ?></p>
             </div>
         </div>
-        <a href="/ERP/hr/shifts/create" class="btn-shift"><i class="ph-bold ph-plus"></i> إضافة وردية جديدة</a>
+        <a href="/ERP/hr/shifts/create" class="btn-shift"><i class="ph-bold ph-plus"></i> <?= $t['add_btn'] ?></a>
+    </div>
+
+    <div>
+        <div class="branch-scope-badge">
+            <i class="ph-bold ph-storefront" style="color:var(--c-shift);"></i>
+            <span><?= $t['active_scope'] ?></span>
+            <span style="color:var(--c-shift); font-weight:900;"><?= htmlspecialchars($activeBranchName) ?></span>
+        </div>
     </div>
 
     <?php if($flashMsg): ?><div style="background: #ecfdf5; color: #059669; padding: 14px; border-radius: 10px; margin-bottom: 20px; font-weight: 700; border: 1px solid #a7f3d0;"><i class="ph-fill ph-check-circle"></i> <?= htmlspecialchars($flashMsg) ?></div><?php endif; ?>
     <?php if($flashErr): ?><div style="background: #fef2f2; color: #dc2626; padding: 14px; border-radius: 10px; margin-bottom: 20px; font-weight: 700; border: 1px solid #fecaca;"><i class="ph-fill ph-warning-circle"></i> <?= htmlspecialchars($flashErr) ?></div><?php endif; ?>
 
     <div class="kpi-row">
-        <div class="kpi-card"><div class="kpi-icon"><i class="ph-duotone ph-list-numbers"></i></div><div class="kpi-info"><h4>إجمالي الورديات</h4><p><?= number_format($stats->total_shifts ?? 0) ?></p></div></div>
-        <div class="kpi-card"><div class="kpi-icon" style="background:#dcfce7; color:#16a34a;"><i class="ph-duotone ph-check-circle"></i></div><div class="kpi-info"><h4 style="color:#16a34a;">ورديات نشطة</h4><p><?= number_format($stats->active_shifts ?? 0) ?></p></div></div>
-        <div class="kpi-card"><div class="kpi-icon" style="background:#f1f5f9; color:#64748b;"><i class="ph-duotone ph-minus-circle"></i></div><div class="kpi-info"><h4 style="color:#64748b;">ورديات متوقفة</h4><p><?= number_format($stats->inactive_shifts ?? 0) ?></p></div></div>
+        <div class="kpi-card"><div class="kpi-icon"><i class="ph-duotone ph-list-numbers"></i></div><div class="kpi-info"><h4><?= $t['kpi_total'] ?></h4><p><?= number_format($stats->total_shifts ?? 0) ?></p></div></div>
+        <div class="kpi-card"><div class="kpi-icon" style="background:#dcfce7; color:#16a34a;"><i class="ph-duotone ph-check-circle"></i></div><div class="kpi-info"><h4 style="color:#16a34a;"><?= $t['kpi_active'] ?></h4><p><?= number_format($stats->active_shifts ?? 0) ?></p></div></div>
+        <div class="kpi-card"><div class="kpi-icon" style="background:#f1f5f9; color:#64748b;"><i class="ph-duotone ph-minus-circle"></i></div><div class="kpi-info"><h4 style="color:#64748b;"><?= $t['kpi_inactive'] ?></h4><p><?= number_format($stats->inactive_shifts ?? 0) ?></p></div></div>
     </div>
 
     <form action="/ERP/hr/shifts" method="GET" class="search-bar">
-        <input type="text" name="search" class="form-control" style="flex:2; min-width:220px;" placeholder="ابحث بكود أو اسم الوردية..." value="<?= htmlspecialchars($search ?? '') ?>">
+        <input type="text" name="search" class="form-control" style="flex:2; min-width:220px;" placeholder="<?= $t['search_ph'] ?>" value="<?= htmlspecialchars($search ?? '') ?>">
         
         <select name="status" class="form-control" style="flex:1; min-width:140px;">
-            <option value="">-- كل الحالات --</option>
-            <option value="active" <?= ($statusFilter==='active')?'selected':'' ?>>وردية مفعلة</option>
-            <option value="inactive" <?= ($statusFilter==='inactive')?'selected':'' ?>>متوقفة</option>
+            <option value=""><?= $t['all_statuses'] ?></option>
+            <option value="active" <?= ($statusFilter==='active')?'selected':'' ?>><?= $t['status_active'] ?></option>
+            <option value="inactive" <?= ($statusFilter==='inactive')?'selected':'' ?>><?= $t['status_inactive'] ?></option>
         </select>
 
-        <button type="submit" class="btn-search"><i class="ph-bold ph-magnifying-glass"></i> فلترة</button>
+        <button type="submit" class="btn-search"><i class="ph-bold ph-magnifying-glass"></i> <?= $t['btn_search'] ?></button>
+        <?php if(!empty($search) || !empty($statusFilter)): ?>
+            <a href="/ERP/hr/shifts" class="btn-search" style="background:#f1f5f9; color:#475569; text-decoration:none;"><i class="ph-bold ph-x"></i> <?= $t['btn_clear'] ?></a>
+        <?php endif; ?>
     </form>
 
     <div class="table-card">
         <table class="shift-table">
             <thead>
                 <tr>
-                    <th style="width: 15%;">كود الوردية</th>
-                    <th style="width: 25%;">المسمى / الاسم</th>
-                    <th style="width: 15%; text-align: center;">وقت الدخول</th>
-                    <th style="width: 15%; text-align: center;">وقت الانصراف</th>
-                    <th style="width: 10%; text-align: center;">فترة السماح</th>
-                    <th style="width: 10%; text-align: center;">الحالة</th>
-                    <th style="width: 10%; text-align: center;">إجراءات</th>
+                    <th style="width: 15%;"><?= $t['col_code'] ?></th>
+                    <th style="width: 25%;"><?= $t['col_name'] ?></th>
+                    <th style="width: 15%; text-align: center;"><?= $t['col_in'] ?></th>
+                    <th style="width: 15%; text-align: center;"><?= $t['col_out'] ?></th>
+                    <th style="width: 10%; text-align: center;"><?= $t['col_grace'] ?></th>
+                    <th style="width: 10%; text-align: center;"><?= $t['col_status'] ?></th>
+                    <th style="width: 10%; text-align: center;"><?= $t['col_actions'] ?></th>
                 </tr>
             </thead>
             <tbody>
                 <?php if (empty($shifts)): ?>
-                    <tr><td colspan="7" style="text-align: center; padding: 40px; color: #94a3b8; font-weight: 700;">لا توجد ورديات عمل مسجلة بمواصفات البحث.</td></tr>
+                    <tr><td colspan="7" style="text-align: center; padding: 40px; color: #94a3b8; font-weight: 700;"><?= $t['empty'] ?></td></tr>
                 <?php else: foreach ($shifts as $s): 
                     $st = $statusMap[$s->status] ?? $statusMap['active'];
                 ?>
                     <tr>
                         <td style="font-family: monospace; font-weight: 900; color: var(--c-shift-dark); font-size: 0.95rem;">
-                            <?= htmlspecialchars($s->code) ?>
+                            <?= htmlspecialchars((string)$s->code) ?>
                         </td>
-                        <td style="font-weight: 800; color: var(--c-text-dark);">
-                            <?= htmlspecialchars($s->name_ar) ?>
+                        <td>
+                            <div style="font-weight: 800; color: var(--c-text-dark);">
+                                <?= htmlspecialchars((string)$s->name_ar) ?>
+                            </div>
+                            <?php if(!empty($s->branch_name)): ?>
+                                <div class="branch-badge"><i class="ph-fill ph-buildings"></i> <?= htmlspecialchars((string)$s->branch_name) ?></div>
+                            <?php endif; ?>
                         </td>
                         <td style="text-align: center; font-family: monospace; font-weight: bold; color: #059669;">
                             <?= date('h:i A', strtotime($s->start_time)) ?>
@@ -124,7 +201,7 @@ $statusMap = [
                             <?= date('h:i A', strtotime($s->end_time)) ?>
                         </td>
                         <td style="text-align: center; font-family: monospace; font-weight: 800; color: #d97706;">
-                            <?= $s->grace_period_mins ?> دقيقة
+                            <?= $s->grace_period_mins ?> <?= $t['mins_lbl'] ?>
                         </td>
                         <td style="text-align: center;">
                             <span class="badge-status" style="background:<?= $st['bg'] ?>; color:<?= $st['color'] ?>;">
@@ -134,7 +211,7 @@ $statusMap = [
                         <td style="text-align: center; white-space: nowrap;">
                             <a href="/ERP/hr/shifts/<?= $s->id ?>" class="action-btn" title="عرض الوردية"><i class="ph-bold ph-eye"></i></a>
                             <a href="/ERP/hr/shifts/<?= $s->id ?>/edit" class="action-btn" title="تعديل"><i class="ph-bold ph-pencil-simple"></i></a>
-                            <form action="/ERP/hr/shifts/<?= $s->id ?>/delete" method="POST" style="display:inline;" onsubmit="return confirm('هل أنت متأكد من حذف هذه الوردية؟');">
+                            <form action="/ERP/hr/shifts/<?= $s->id ?>/delete" method="POST" style="display:inline;" onsubmit="return confirm('<?= $t['confirm_delete'] ?>');">
                                 <button type="submit" class="action-btn delete" title="حذف"><i class="ph-bold ph-trash"></i></button>
                             </form>
                         </td>
@@ -154,3 +231,9 @@ $statusMap = [
         </div>
     <?php endif; ?>
 </div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    document.querySelectorAll('.table-card .dataTables_filter, .table-card .dataTables_length, .table-card .dataTables_info, .table-card .dataTables_paginate').forEach(el => el.remove());
+});
+</script>
